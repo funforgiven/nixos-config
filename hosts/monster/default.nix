@@ -26,12 +26,13 @@
 
       programs = {
         discord.enable = true;
+        unity.enable = true;
         gamemode.enable = true;
       };
     };
 
     editors = {
-      rider.enable = false;
+      rider.enable = true;
     };
 
     services = {

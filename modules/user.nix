@@ -5,7 +5,7 @@
     users.users.funforgiven = {
       isNormalUser = true;
       description = "Fahrican Elidemir";
-      extraGroups = [ "networkmanager" "wheel" "input" "power" ];
+      extraGroups = [ "networkmanager" "wheel" "input" "power" "gamemode"];
       shell = pkgs.zsh;
     };
 
