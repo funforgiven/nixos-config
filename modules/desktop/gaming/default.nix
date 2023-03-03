@@ -12,6 +12,11 @@ in
   config = mkIf cfg.enable {
     environment.systemPackages = with pkgs; [
       lutris
+      heroic
     ];
+
+    programs.gamemode = {
+      enable = true;
+    };
   };
 }

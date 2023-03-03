@@ -17,10 +17,17 @@ with lib;
     ];
   };
 
+  # Networking
   networking.networkmanager.enable = true;
 
   # Steam controller support
   hardware.steam-hardware.enable = true;
+
+  # Zram
+  zramSwap.enable = true;
+
+  # Microcode
+  hardware.enableRedistributableFirmware = true;
 
   boot = {
     kernelPackages = pkgs.linuxKernel.packages.linux_zen;
