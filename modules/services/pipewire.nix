@@ -2,10 +2,10 @@
 
 with lib;
 with lib.my;
-let cfg = config.modules.hardware.pipewire;
+let cfg = config.modules.services.pipewire;
 in
 {
-  options.modules.hardware.pipewire = {
+  options.modules.services.pipewire = {
     enable = mkBoolOpt false;
   };
 

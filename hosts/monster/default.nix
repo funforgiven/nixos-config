@@ -11,12 +11,11 @@
   modules = {
     desktop = {
       kde.enable = true;
-      apps.enable = true;
       fonts.enable = true;
 
       browsers = {
-        default = "firefox";
         firefox.enable = true;
+        default = "firefox";
       };
 
       gaming = {
@@ -25,24 +24,23 @@
       };
 
       programs = {
+        essentials.enable = true;
         discord.enable = true;
         unity.enable = true;
+        rider.enable = true;
       };
-    };
-
-    editors = {
-      rider.enable = true;
     };
 
     services = {
       tailscale.enable = true;
+      pipewire.enable = true;
+      docker.enable = true;
     };
 
     hardware = {
       bluetooth.enable = true;
       intel.enable = true;
       nvidia.enable = true;
-      pipewire.enable = true;
     };
 
     shell = {

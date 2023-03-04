@@ -2,10 +2,10 @@
 
 with lib;
 with lib.my;
-let cfg = config.modules.desktop.apps;
+let cfg = config.modules.desktop.programs.essentials;
 in
 {
-  options.modules.desktop.apps = {
+  options.modules.desktop.programs.essentials = {
     enable = mkBoolOpt false;
   };
 
