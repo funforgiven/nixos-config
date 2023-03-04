@@ -3,7 +3,7 @@
 with lib;
 with lib.my;
 let
-  cfg = config.modules.desktop.programs.rider;
+  cfg = config.modules.editors.rider;
 
   rider-fhs = pkgs.buildFHSUserEnv {
     name = "rider-fhs";
@@ -43,7 +43,7 @@ let
   });
 in
 {
-  options.modules.desktop.programs.rider = {
+  options.modules.editors.rider = {
     enable = mkBoolOpt false;
   };
 

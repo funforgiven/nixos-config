@@ -12,7 +12,7 @@ in
   config = mkIf cfg.enable {
     fonts.fonts = with pkgs; [
       liberation_ttf
-      fira-code
+      (nerdfonts.override { fonts = [ "FiraCode" "JetBrainsMono" ]; })
 
       # Some CJK Fonts
       source-han-serif

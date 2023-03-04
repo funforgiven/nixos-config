@@ -15,6 +15,7 @@
 
       browsers = {
         firefox.enable = true;
+        brave.enable = true;
         default = "firefox";
       };
 
@@ -24,11 +25,21 @@
       };
 
       programs = {
-        essentials.enable = true;
+        enable = true;
         discord.enable = true;
         unity.enable = true;
-        rider.enable = true;
       };
+
+      term = {
+        wezterm.enable = true;
+        default = "wezterm";
+      };
+    };
+
+    editors = {
+      rider.enable = true;
+      vscode.enable = true;
+      default = "vscode";
     };
 
     services = {
@@ -48,6 +59,9 @@
     };
   };
 
+  # Zram
+  zramSwap.enable = true;
+
   # Some battery life tuning
   services.tlp.enable = true;
 
@@ -56,4 +70,5 @@
 
   # Thermal config
   services.thermald.enable = true;
+
 }

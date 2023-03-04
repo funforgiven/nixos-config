@@ -20,9 +20,6 @@ with lib;
   # Networking
   networking.networkmanager.enable = true;
 
-  # Zram
-  zramSwap.enable = true;
-
   boot = {
     kernelPackages = pkgs.linuxKernel.packages.linux_zen;
     loader.grub = {
