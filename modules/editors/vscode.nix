@@ -19,7 +19,9 @@ in
     home-manager.users.funforgiven.programs.vscode = {
       enable = true;
       extensions = with pkgs.vscode-extensions; [
+        catppuccin.catppuccin-vsc
         pkief.material-icon-theme
+
         jnoortheen.nix-ide
       ];
 
@@ -29,6 +31,23 @@ in
         "terminal.integrated.persistentSessionReviveProcess" = "never";
 
         "workbench.iconTheme" = "material-icon-theme";
+        "workbench.colorTheme" = "Catppuccin Mocha";
+
+        "window.titleBarStyle" = "custom";
+
+        "catppuccin.accentColor" = "sky";
+        "catppuccin.colorOverrides" = {
+          "mocha" = {
+            "base" = "#000000";
+            "mantle" = "#010101";
+            "crust" = "#020202";
+          };
+        };
+        "catppuccin.customUIColors" = {
+          "mocha" = {
+            "statusBar.foreground" = "accent";
+          };
+        };
 
         "editor.fontSize" = 14;
         "editor.fontFamily" = "JetBrains Mono Nerd Font";
@@ -37,6 +56,8 @@ in
         "explorer.confirmDelete" = false;
         "explorer.sortOrder" = "type";
 
+        "files.autoSave" = "onFocusChange";
+        "files.insertFinalNewline" = true;
         "files.trimTrailingWhitespace" = true;
 
         "nix.enableLanguageServer" = true;

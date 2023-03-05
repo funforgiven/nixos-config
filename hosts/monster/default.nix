@@ -41,7 +41,7 @@
       vscode.enable = true;
       rider.enable = true;
       editor = "hx";
-      visual = "code";
+      visual = "code --wait";
     };
 
     services = {

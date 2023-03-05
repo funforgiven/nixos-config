@@ -22,9 +22,15 @@ in
       layout = "tr";
     };
 
-    services.xserver.desktopManager.plasma5.excludePackages = with pkgs; [
-      elisa # Default KDE video player, use VLC instead
-      kwrited # Use kate instead for my basic text editor
+    environment.systemPackages = with pkgs; [
+      materia-theme
+      materia-kde-theme
     ];
+
+    services.xserver.desktopManager.plasma5.excludePackages = with pkgs;
+      [
+        elisa # Default KDE video player, use MPV instead
+        kwrited # Use vscode and helix instead
+      ];
   };
 }
