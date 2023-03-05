@@ -19,8 +19,7 @@ in
 
     # Configure keymap in X11
     services.xserver = {
-      layout = "us";
-      xkbVariant = "";
+      layout = "tr";
     };
 
     services.xserver.desktopManager.plasma5.excludePackages = with pkgs; [

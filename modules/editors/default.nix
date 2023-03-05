@@ -5,10 +5,12 @@ with lib.my;
 let cfg = config.modules.editors;
 in {
   options.modules.editors = {
-    default = mkOpt types.str "nano";
+    editor = mkOpt types.str "nano";
+    visual = mkOpt types.str "nano";
   };
 
-  config = mkIf (cfg.default != null) {
-    environment.variables.EDITOR = cfg.default;
+  config = {
+    environment.variables.EDITOR = mkIf (cfg.editor != null) cfg.editor;
+    environment.variables.VISUAL = mkIf (cfg.visual != null) cfg.visual;
   };
 }

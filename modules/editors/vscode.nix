@@ -20,6 +20,7 @@ in
       enable = true;
       extensions = with pkgs.vscode-extensions; [
         pkief.material-icon-theme
+        jnoortheen.nix-ide
       ];
 
       userSettings = {
@@ -33,21 +34,9 @@ in
         "editor.fontFamily" = "JetBrains Mono Nerd Font";
         "editor.fontLigatures" = true;
 
-        "editor.guides.bracketPairs" = true;
-        "editor.bracketPairColorization.enabled" = true;
-
-        "editor.suggestSelection" = "first";
-        "editor.inlineSuggest.enabled" = true;
-        "editor.suggest.preview" = true;
-        "editor.quickSuggestions" = {
-          "strings" = true;
-        };
-
         "explorer.confirmDelete" = false;
         "explorer.sortOrder" = "type";
 
-        "files.autoSave" = "afterDelay";
-        "files.autoSaveDelay" = 200;
         "files.trimTrailingWhitespace" = true;
 
         "nix.enableLanguageServer" = true;

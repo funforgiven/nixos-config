@@ -37,9 +37,11 @@
     };
 
     editors = {
-      rider.enable = true;
+      helix.enable = true;
       vscode.enable = true;
-      default = "vscode";
+      rider.enable = true;
+      editor = "hx";
+      visual = "code";
     };
 
     services = {

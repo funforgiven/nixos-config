@@ -11,7 +11,6 @@ in
 
   config = mkIf cfg.enable {
     environment.systemPackages = with pkgs; [
-      kate
       ark
       p7zip
       unrar
@@ -20,7 +19,6 @@ in
       qbittorrent
       obs-studio
       tdesktop
-      kitty
     ];
   };
 }
