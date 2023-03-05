@@ -20,6 +20,7 @@ in
       obs-studio
       tdesktop
       neofetch
+      tokei
     ];
   };
 }

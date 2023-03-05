@@ -12,10 +12,9 @@ in
   config = mkIf cfg.enable {
     home-manager.users.funforgiven.programs.starship = {
       enable = true;
-      enableZshIntegration = mkIf config.modules.shell.zsh.enable true;
+      enableZshIntegration = true;
       settings = {
         line_break.disabled = true;
-        add_newline = true;
       };
     };
   };

@@ -13,41 +13,27 @@ in
   config = mkIf cfg.enable {
     environment.systemPackages = with pkgs; [
       nixpkgs-fmt
-      nil
+      rnix-lsp
     ];
 
     home-manager.users.funforgiven.programs.vscode = {
       enable = true;
       extensions = with pkgs.vscode-extensions; [
-        catppuccin.catppuccin-vsc
+        mvllow.rose-pine
         pkief.material-icon-theme
 
         jnoortheen.nix-ide
       ];
 
       userSettings = {
-        "terminal.integrated.fontFamily" = "JetBrains Mono Nerd Font";
+        "terminal.integrated.fontFamily" = "FiraCode Nerd Font";
         "terminal.integrated.defaultProfile.linux" = "zsh";
         "terminal.integrated.persistentSessionReviveProcess" = "never";
 
         "workbench.iconTheme" = "material-icon-theme";
-        "workbench.colorTheme" = "Catppuccin Mocha";
+        "workbench.colorTheme" = "Rosé Pine";
 
         "window.titleBarStyle" = "custom";
-
-        "catppuccin.accentColor" = "sky";
-        "catppuccin.colorOverrides" = {
-          "mocha" = {
-            "base" = "#000000";
-            "mantle" = "#010101";
-            "crust" = "#020202";
-          };
-        };
-        "catppuccin.customUIColors" = {
-          "mocha" = {
-            "statusBar.foreground" = "accent";
-          };
-        };
 
         "editor.fontSize" = 14;
         "editor.fontFamily" = "JetBrains Mono Nerd Font";
@@ -60,8 +46,7 @@ in
         "files.trimTrailingWhitespace" = true;
 
         "nix.enableLanguageServer" = true;
-        "nix.serverPath" = "nil";
-        "nix.serverSettings".nil.formatting.command = [ "nixpkgs-fmt" ];
+        "nix.serverPath" = "rnix-lsp";
         "[nix]" = {
           "editor.tabSize" = 2;
           "editor.formatOnSave" = true;

@@ -31,8 +31,8 @@
       };
 
       term = {
-        wezterm.enable = true;
-        default = "wezterm";
+        kitty.enable = true;
+        default = "kitty";
       };
     };
 
@@ -73,5 +73,4 @@
 
   # Thermal config
   services.thermald.enable = true;
-
 }
