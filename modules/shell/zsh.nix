@@ -10,10 +10,6 @@ in
   };
 
   config = mkIf cfg.enable {
-    programs.zsh = {
-      enable = true;
-    };
-
     home-manager.users.funforgiven.programs.zsh = {
       enable = true;
       enableAutosuggestions = true;
@@ -22,7 +18,6 @@ in
       oh-my-zsh = {
         enable = true;
         theme = "robbyrussell";
-        plugins = [ "git" ];
       };
     };
   };

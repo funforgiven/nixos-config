@@ -56,7 +56,6 @@ in
         "explorer.confirmDelete" = false;
         "explorer.sortOrder" = "type";
 
-        "files.autoSave" = "onFocusChange";
         "files.insertFinalNewline" = true;
         "files.trimTrailingWhitespace" = true;
 
