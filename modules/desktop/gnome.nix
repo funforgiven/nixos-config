@@ -14,7 +14,7 @@ in
     services.xserver.enable = true;
     hardware.pulseaudio.enable = false;
 
-    # Enable the KDE Plasma Desktop Environment.
+    # Enable the Gnome Desktop Environment.
     services.xserver.displayManager.gdm.enable = true;
     services.xserver.desktopManager.gnome.enable = true;
 
@@ -35,10 +35,9 @@ in
 
       home.packages = with pkgs.gnomeExtensions; [
         user-themes
-        improved-workspace-indicator
         vitals
-        blur-my-shell
         dash-to-panel
+        appindicator
       ];
 
       dconf.settings = with lib.hm.gvariant; {
@@ -59,12 +58,10 @@ in
           ];
           position-in-panel = 0;
         };
-        "org/gnome/shell/extensions/improved-workspace-indicator" = {
-          panel-position = "right";
-        };
         "org/gnome/shell/extensions/dash-to-panel" = {
           "appicon-margin" = 0;
           "appicon-padding" = 6;
+          "tray-padding" = 8;
           "click-action" = "TOGGLE-SHOWPREVIEW";
           "dot-position" = "TOP";
           "dot-style-focused" = "METRO";
@@ -75,6 +72,7 @@ in
           "shift-click-action" = "LAUNCH";
           "scroll-icon-action" = "NOTHING";
           "scroll-panel-action" = "NOTHING";
+          "stockgs-panelbtn-click-only" = true;
         };
         "org/gnome/desktop/interface" = {
           color-scheme = "prefer-dark";
