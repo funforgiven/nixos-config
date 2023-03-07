@@ -10,7 +10,7 @@ in
   };
 
   config = mkIf cfg.enable {
-    environment.systemPackages = with pkgs; [
+    environment.systemPackages = with pkgs;   [
       ark
       p7zip
       unrar
@@ -21,6 +21,8 @@ in
       tdesktop
       neofetch
       tokei
+      mailspring
+      godot
     ];
   };
 }

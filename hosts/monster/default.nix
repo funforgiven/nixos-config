@@ -10,7 +10,7 @@
 
   modules = {
     desktop = {
-      kde.enable = true;
+      gnome.enable = true;
       fonts.enable = true;
 
       browsers = {
