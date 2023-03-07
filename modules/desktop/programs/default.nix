@@ -23,6 +23,7 @@ in
       tokei
       mailspring
       godot
+      easyeffects
     ];
   };
 }

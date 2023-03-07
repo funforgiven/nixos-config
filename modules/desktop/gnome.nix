@@ -42,6 +42,7 @@ in
 
       dconf.settings = with lib.hm.gvariant; {
         "org/gnome/shell" = {
+          disable-user-extensions = false;
           enabled-extensions = map (extension: extension.extensionUuid) home.packages;
           disabled-extensions = [ ];
         };
