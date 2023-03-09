@@ -48,6 +48,7 @@
       tailscale.enable = true;
       pipewire.enable = true;
       docker.enable = true;
+      onepassword.enable = true;
     };
 
     hardware = {

@@ -12,17 +12,18 @@ in
   config = mkIf cfg.enable {
     # Enable the X11 windowing system.
     services.xserver.enable = true;
-    hardware.pulseaudio.enable = false;
 
     # Enable the Gnome Desktop Environment.
     services.xserver.displayManager.gdm.enable = true;
     services.xserver.desktopManager.gnome.enable = true;
 
     # Configure keymap in X11
-    services.xserver = {
-      layout = "tr";
-    };
+    services.xserver.layout = "tr";
 
+    services.gnome.core-utilities.enable = true;
+    services.udev.packages = with pkgs; [ gnome.gnome-settings-daemon ];
+
+    hardware.pulseaudio.enable = false;
     systemd.services.NetworkManager-wait-online.enable = false;
 
     environment.systemPackages = with pkgs; [
