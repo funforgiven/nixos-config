@@ -10,9 +10,12 @@ in
   };
 
   config = mkIf cfg.enable {
-    virtualisation.docker.enable = true;
+    virtualisation.docker = {
+      enable = true;
+      storageDriver = "btrfs";
+      liveRestore = false;
+    };
+
     users.users.funforgiven.extraGroups = [ "docker" ];
-    virtualisation.docker.storageDriver = "btrfs";
   };
 }
-

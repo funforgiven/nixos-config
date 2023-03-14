@@ -24,6 +24,7 @@ in
       mailspring
       godot
       easyeffects
+      teams
     ];
   };
 }

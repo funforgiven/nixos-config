@@ -3,12 +3,13 @@
 with lib;
 with lib.my;
 let cfg = config.modules.desktop.browsers;
-in {
+in
+{
   options.modules.desktop.browsers = {
     default = mkOpt (with types; nullOr str) null;
   };
 
   config = mkIf (cfg.default != null) {
-    environment.variables.BROWSER = cfg.default;
+    home-manager.users.funforgiven.home.sessionVariables.BROWSER = cfg.default;
   };
 }
