@@ -20,6 +20,10 @@ with lib;
   # Networking
   networking.networkmanager.enable = true;
 
+  home-manager.users.funforgiven.xdg.mimeApps = {
+    enable = true;
+  };
+
   boot = {
     kernelPackages = pkgs.linuxKernel.packages.linux_zen;
     loader.grub = {

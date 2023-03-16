@@ -2,16 +2,16 @@
 
 with lib;
 with lib.my;
-let cfg = config.modules.desktop.browsers.brave;
+let cfg = config.modules.desktop.browsers.edge;
 in
 {
-  options.modules.desktop.browsers.brave = {
+  options.modules.desktop.browsers.edge = {
     enable = mkBoolOpt false;
   };
 
   config = mkIf cfg.enable {
     environment.systemPackages = with pkgs; [
-      brave
+      microsoft-edge
     ];
   };
 }

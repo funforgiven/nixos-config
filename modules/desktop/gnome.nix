@@ -27,6 +27,8 @@ in
       gnome.gnome-tweaks
     ];
 
+    services.udev.packages = with pkgs; [ gnome.gnome-settings-daemon ];
+
     home-manager.users.funforgiven = { pkgs, config, lib, ... }:
       let
         orchis = pkgs.orchis-theme.override {
@@ -74,6 +76,7 @@ in
             "shift-click-action" = "LAUNCH";
             "scroll-icon-action" = "NOTHING";
             "scroll-panel-action" = "NOTHING";
+            "stockgs-panelbtn-click-only" = true;
           };
           "org/gnome/desktop/interface" = {
             color-scheme = "prefer-dark";

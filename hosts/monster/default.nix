@@ -16,7 +16,7 @@
       browsers = {
         firefox.enable = true;
         brave.enable = true;
-        default = "firefox";
+        edge.enable = true;
       };
 
       gaming = {
@@ -32,7 +32,6 @@
 
       term = {
         kitty.enable = true;
-        default = "kitty";
       };
     };
 
@@ -67,5 +66,5 @@
   zramSwap.enable = true;
 
   # Thermal config
-  # services.thermald.enable = true;
+  services.thermald.enable = true;
 }
