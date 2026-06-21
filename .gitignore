@@ -1,0 +1,14 @@
+result
+result-*
+.direnv/
+.envrc
+.codex-doc-cache/
+
+# Local secrets must not enter the Nix store or Git history.
+secrets/*.hash
+secrets/*.age
+secrets/*.key
+secrets/*.pem
+
+# Machine-local generated files.
+hardware-configuration.nix
