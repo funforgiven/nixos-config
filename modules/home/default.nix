@@ -9,6 +9,7 @@
     ./codex.nix
     ./niri.nix
     ./noctalia.nix
+    ./onepassword.nix
     ./packages.nix
     ./shell.nix
     ./terminal.nix
