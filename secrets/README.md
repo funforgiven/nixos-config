@@ -8,10 +8,10 @@ The system expects this root-owned file on the installed machine:
 /var/lib/nixos-secrets/funforgiven-password.hash
 ```
 
-Generate it with:
+During installation, after disko mounts the target system at `/mnt`, generate it with:
 
 ```sh
-sudo mkdir -p /var/lib/nixos-secrets
-mkpasswd -m yescrypt | sudo tee /var/lib/nixos-secrets/funforgiven-password.hash >/dev/null
-sudo chmod 600 /var/lib/nixos-secrets/funforgiven-password.hash
+sudo mkdir -p /mnt/var/lib/nixos-secrets
+mkpasswd -m yescrypt | sudo tee /mnt/var/lib/nixos-secrets/funforgiven-password.hash >/dev/null
+sudo chmod 600 /mnt/var/lib/nixos-secrets/funforgiven-password.hash
 ```
