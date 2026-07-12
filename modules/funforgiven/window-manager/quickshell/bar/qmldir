@@ -3,6 +3,7 @@ Bar 1.0 Bar.qml
 Clock 1.0 Clock.qml
 MixerButton 1.0 MixerButton.qml
 NiriStatus 1.0 NiriStatus.qml
+SessionControls 1.0 SessionControls.qml
 Tray 1.0 Tray.qml
 TrayMenu 1.0 TrayMenu.qml
 WorkspaceStrip 1.0 WorkspaceStrip.qml

@@ -10,6 +10,8 @@ Item {
     property string accessibleName: label
     property string tooltipText: accessibleName
     property color accent: Shell.Theme.systemAccent
+    property color iconColor: Shell.Theme.primaryText
+    property bool tintIcon: false
     property bool checked: false
     property bool attention: false
     property bool hovered: pointer.containsMouse
@@ -100,12 +102,28 @@ Item {
     }
 
     IconImage {
-        visible: root.iconSource.length > 0
+        visible: root.iconSource.length > 0 && !root.tintIcon
         anchors.centerIn: parent
         width: root.iconSize
         height: root.iconSize
-        source: root.iconSource
+        source: root.tintIcon ? "" : root.iconSource
         mipmap: true
+        opacity: root.enabled ? 1 : Shell.Theme.disabledOpacity
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Shell.Theme.animationFast
+            }
+        }
+    }
+
+    TintedIcon {
+        visible: root.iconSource.length > 0 && root.tintIcon
+        anchors.centerIn: parent
+        width: root.iconSize
+        height: root.iconSize
+        source: root.tintIcon ? root.iconSource : ""
+        tint: root.iconColor
         opacity: root.enabled ? 1 : Shell.Theme.disabledOpacity
 
         Behavior on opacity {

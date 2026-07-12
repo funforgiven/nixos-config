@@ -268,6 +268,7 @@ in
             readonly property string dockMode: "always-visible"
             readonly property string audioController: ${qmlString (lib.getExe' audioControllerPackage "funforgiven-audioctl")}
             readonly property string appLauncher: ${qmlString (lib.getExe pkgs.app2unit)}
+            readonly property string systemctl: ${qmlString (lib.getExe' pkgs.systemd "systemctl")}
             readonly property bool nativePolkitEnabled: ${
               if polkitAgent == "quickshell" then "true" else "false"
             }

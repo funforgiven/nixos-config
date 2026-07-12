@@ -36,6 +36,21 @@ rg --quiet --fixed-strings 'implicitWidth: Shell.Theme.controlCompactSize' \
   "$shell_config/components/IconButton.qml"
 rg --quiet --fixed-strings 'return Shell.Theme.pressedSurface;' \
   "$shell_config/components/IconButton.qml"
+tinted_icon="$shell_config/components/TintedIcon.qml"
+test -f "$tinted_icon"
+rg --quiet --fixed-strings 'TintedIcon 1.0 TintedIcon.qml' \
+  "$shell_config/components/qmldir"
+rg --quiet --fixed-strings 'import QtQuick.Controls as Controls' "$tinted_icon"
+rg --quiet --fixed-strings 'Controls.ToolButton {' "$tinted_icon"
+rg --quiet --fixed-strings 'display: Controls.AbstractButton.IconOnly' "$tinted_icon"
+rg --quiet --fixed-strings 'background: null' "$tinted_icon"
+rg --quiet --fixed-strings 'icon.width: Math.max(1, root.width)' "$tinted_icon"
+rg --quiet --fixed-strings 'icon.height: Math.max(1, root.height)' "$tinted_icon"
+rg --quiet --fixed-strings 'icon.color: root.tint' "$tinted_icon"
+rg --quiet --fixed-strings 'focusPolicy: Qt.NoFocus' "$tinted_icon"
+rg --quiet --fixed-strings 'property bool tintIcon: false' \
+  "$shell_config/components/IconButton.qml"
+rg --quiet --fixed-strings 'TintedIcon {' "$shell_config/components/IconButton.qml"
 tooltip="$shell_config/components/Tooltip.qml"
 rg --quiet --fixed-strings 'PopupWindow {' "$tooltip"
 rg --quiet --fixed-strings 'property int maximumWidth: 320' "$tooltip"
@@ -52,6 +67,8 @@ rg --quiet --fixed-strings 'id: rightIsland' "$bar"
 rg --quiet --fixed-strings 'implicitHeight: 56' "$bar"
 rg --quiet --fixed-strings 'workspaceTasks.implicitWidth' "$bar"
 rg --quiet --fixed-strings 'NiriStatus {' "$bar"
+rg --multiline --multiline-dotall --quiet \
+  'id: rightIsland.*SessionControls[[:space:]]*\{' "$bar"
 rg --quiet --fixed-strings 'readonly property bool failed: Services.NiriService.stale' \
   "$shell_config/bar/NiriStatus.qml"
 rg --quiet --fixed-strings 'Accessible.role: Accessible.AlertMessage' \
@@ -71,6 +88,25 @@ rg --quiet --fixed-strings 'Services.NiriService.focusWindow(windowDelegate.wind
 test ! -e "$shell_config/bar/WindowStrip.qml"
 rg --quiet --fixed-strings 'Services.AudioService.channel("system")' \
   "$shell_config/bar/MixerButton.qml"
+session_controls="$shell_config/bar/SessionControls.qml"
+test -f "$session_controls"
+rg --quiet --fixed-strings 'SessionControls 1.0 SessionControls.qml' \
+  "$shell_config/bar/qmldir"
+test "$(rg --count --fixed-strings 'Components.IconButton {' "$session_controls")" -eq 3
+rg --quiet --fixed-strings 'system-log-out-symbolic' "$session_controls"
+rg --quiet --fixed-strings 'system-reboot-symbolic' "$session_controls"
+rg --quiet --fixed-strings 'system-shutdown-symbolic' "$session_controls"
+test "$(rg --count --fixed-strings 'tintIcon: true' "$session_controls")" -eq 3
+rg --quiet --fixed-strings 'return `Click again to confirm ${label.toLowerCase()}`;' \
+  "$session_controls"
+test "$(rg --count --fixed-strings 'activeFocusOnTab: false' "$session_controls")" -eq 3
+test "$(rg --count --fixed-strings 'if (button === Qt.LeftButton)' "$session_controls")" -eq 3
+test "$(rg --count --fixed-strings 'enabled: !Services.SessionActions.busy' "$session_controls")" -eq 3
+rg --quiet --fixed-strings 'Services.SessionActions.requestLogout();' "$session_controls"
+rg --quiet --fixed-strings 'Services.SessionActions.requestReboot();' "$session_controls"
+rg --quiet --fixed-strings 'Services.SessionActions.requestPoweroff();' "$session_controls"
+rg --quiet --fixed-strings 'Services.SessionActions.failedAction === action' "$session_controls"
+rg --quiet --fixed-strings 'Services.SessionActions.error' "$session_controls"
 tray="$shell_config/bar/Tray.qml"
 tray_menu="$shell_config/bar/TrayMenu.qml"
 rg --quiet --fixed-strings 'TrayMenu {' "$tray"
@@ -127,6 +163,15 @@ test "$(rg --count --fixed-strings 'horizontalAlignment: Text.AlignLeft' "$tray_
 ! rg --quiet --fixed-strings 'Controls.ScrollBar' "$tray_menu"
 rg --quiet --fixed-strings 'trayDelegate.trayItem.secondaryActivate();' "$tray"
 rg --quiet --fixed-strings 'trayDelegate.trayItem.scroll(' "$tray"
+rg --quiet --fixed-strings 'String(trayItem.id || "").toLowerCase() === "fcitx"' "$tray"
+rg --quiet --fixed-strings 'trayIconSource.indexOf("/input-keyboard-symbolic") >= 0' "$tray"
+rg --quiet --fixed-strings 'Components.TintedIcon {' "$tray"
+rg --quiet --fixed-strings 'source: trayDelegate.usesFcitxKeyboardSymbol ? trayDelegate.trayItem.icon : ""' "$tray"
+rg --quiet --fixed-strings 'tint: Shell.Theme.primaryText' "$tray"
+rg --multiline --multiline-dotall --quiet \
+  'Components\.TintedIcon[[:space:]]*\{[^}]*width:[[:space:]]*Shell\.Theme\.iconMediumSize[^}]*height:[[:space:]]*Shell\.Theme\.iconMediumSize' \
+  "$tray"
+! rg --quiet --fixed-strings 'fcitx-kbd' "$tray"
 ! rg --quiet --fixed-strings 'trayItem.display(' "$tray"
 
 dock="$shell_config/dock/Dock.qml"

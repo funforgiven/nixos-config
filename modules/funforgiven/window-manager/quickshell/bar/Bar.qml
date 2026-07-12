@@ -104,6 +104,11 @@ Scope {
                         height: parent.height
                         width: implicitWidth
                     }
+
+                    SessionControls {
+                        height: parent.height
+                        width: implicitWidth
+                    }
                 }
             }
         }

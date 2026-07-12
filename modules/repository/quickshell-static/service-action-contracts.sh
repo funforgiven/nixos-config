@@ -9,6 +9,8 @@ audio_actions="$shell_config/services/AudioActions.qml"
 audio_service="$shell_config/services/AudioService.qml"
 app_service="$shell_config/services/AppService.qml"
 niri_service="$shell_config/services/NiriService.qml"
+session_actions="$shell_config/services/SessionActions.qml"
+session_command="$shell_config/services/SessionCommand.js"
 
 rg --quiet --fixed-strings 'var seenStreamRefs = Object.create(null);' "$audio_actions"
 rg --quiet --fixed-strings 'var actionable = live.filter(function (streamRef)' "$audio_actions"
@@ -61,6 +63,12 @@ rg --quiet --fixed-strings '_abortActionQueue("niri event state became stale: " 
 rg --quiet --fixed-strings 'if (!root.connected || root.stale)' "$niri_service"
 rg --quiet --fixed-strings 'if (!root._eventGenerationHealthy && root.connected && !root.stale)' "$niri_service"
 test "$(rg --count --fixed-strings 'root._eventReconnectAttempt = 0;' "$niri_service")" -eq 1
+rg --quiet --fixed-strings 'function quit(skipConfirmation)' \
+  "$shell_config/services/NiriProtocol.js" "$niri_service"
+rg --quiet --fixed-strings 'skip_confirmation: skipConfirmation' \
+  "$shell_config/services/NiriProtocol.js"
+rg --quiet --fixed-strings 'return root._enqueueAction("quit", NiriProtocol.quit(skipConfirmation));' \
+  "$niri_service"
 rg --quiet --fixed-strings 'next._initialWorkspacesReceived' \
   "$shell_config/services/NiriState.js"
 rg --quiet --fixed-strings 'next._initialWindowsReceived' \
@@ -76,6 +84,33 @@ rg --quiet 'readonly property string appLauncher: "/nix/store/.+/bin/app2unit"' 
 rg --quiet \
   'readonly property string audioController: "/nix/store/.+/bin/funforgiven-audioctl"' \
   "$shell_config/generated/ShellConfig.qml"
+rg --quiet \
+  'readonly property string systemctl: "/nix/store/.+-systemd-[^"]+/bin/systemctl"' \
+  "$shell_config/generated/ShellConfig.qml"
+
+test -f "$session_actions"
+test -f "$session_command"
+rg --quiet --fixed-strings 'singleton SessionActions 1.0 SessionActions.qml' \
+  "$shell_config/services/qmldir"
+rg --quiet --fixed-strings 'readonly property bool busy: root.activeAction.length > 0' \
+  "$session_actions"
+rg --quiet --fixed-strings 'readonly property int confirmationTimeoutMs: 5000' \
+  "$session_actions"
+rg --quiet --fixed-strings 'if (root.armedAction !== action)' "$session_actions"
+rg --quiet --fixed-strings 'NiriService.quit(true)' "$session_actions"
+rg --quiet --fixed-strings 'SessionCommand.systemctl(Shell.ShellConfig.systemctl, action)' \
+  "$session_actions"
+rg --quiet --fixed-strings 'action !== "reboot" && action !== "poweroff"' \
+  "$session_command"
+rg --quiet --fixed-strings 'if (!binary.startsWith("/"))' "$session_command"
+rg --quiet --fixed-strings 'return [binary, "--check-inhibitors=yes", action];' \
+  "$session_command"
+rg --quiet --fixed-strings 'stderr: StdioCollector {' "$session_actions"
+rg --quiet --fixed-strings 'process.errorText || process.outputText' "$session_actions"
+rg --quiet --fixed-strings 'root.failedAction = action;' "$session_actions"
+rg --quiet --fixed-strings 'root.error = detail;' "$session_actions"
+! rg --quiet -- '(--force|--check-inhibitors=no|"-i"|"--user")' \
+  "$session_actions" "$session_command"
 
 mkdir -p \
   "$TMPDIR/app2unit-empty" \

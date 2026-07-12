@@ -3,3 +3,4 @@ singleton AppService 1.0 AppService.qml
 singleton AudioActions 1.0 AudioActions.qml
 singleton AudioService 1.0 AudioService.qml
 singleton NiriService 1.0 NiriService.qml
+singleton SessionActions 1.0 SessionActions.qml

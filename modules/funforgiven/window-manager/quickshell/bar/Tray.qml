@@ -83,6 +83,8 @@ Item {
                 readonly property var trayItem: modelData
                 readonly property bool needsAttention: trayItem.status === Status.NeedsAttention
                 readonly property bool passive: trayItem.status === Status.Passive
+                readonly property string trayIconSource: String(trayItem.icon || "")
+                readonly property bool usesFcitxKeyboardSymbol: String(trayItem.id || "").toLowerCase() === "fcitx" && trayIconSource.indexOf("/input-keyboard-symbolic") >= 0
                 readonly property string tooltipText: {
                     const title = trayItem.tooltipTitle || trayItem.title || trayItem.id || "Tray item";
                     return trayItem.tooltipDescription ? `${title}\n${trayItem.tooltipDescription}` : title;
@@ -124,11 +126,21 @@ Item {
                 }
 
                 IconImage {
+                    visible: !trayDelegate.usesFcitxKeyboardSymbol
                     anchors.centerIn: parent
                     width: Shell.Theme.iconMediumSize
                     height: Shell.Theme.iconMediumSize
-                    source: trayDelegate.trayItem.icon
+                    source: trayDelegate.usesFcitxKeyboardSymbol ? "" : trayDelegate.trayItem.icon
                     mipmap: true
+                }
+
+                Components.TintedIcon {
+                    visible: trayDelegate.usesFcitxKeyboardSymbol
+                    anchors.centerIn: parent
+                    width: Shell.Theme.iconMediumSize
+                    height: Shell.Theme.iconMediumSize
+                    source: trayDelegate.usesFcitxKeyboardSymbol ? trayDelegate.trayItem.icon : ""
+                    tint: Shell.Theme.primaryText
                 }
 
                 Rectangle {

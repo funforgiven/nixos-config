@@ -16,6 +16,20 @@ function eventStream() {
     return "EventStream";
 }
 
+function quit(skipConfirmation) {
+    if (typeof skipConfirmation !== "boolean") {
+        return null;
+    }
+
+    return {
+        Action: {
+            Quit: {
+                skip_confirmation: skipConfirmation
+            }
+        }
+    };
+}
+
 function focusWorkspace(id) {
     if (!isId(id)) {
         return null;
@@ -94,6 +108,7 @@ if (typeof module !== "undefined" && module.exports) {
         focusWindow: focusWindow,
         focusWorkspace: focusWorkspace,
         isId: isId,
+        quit: quit,
         replyResult: replyResult
     };
 }

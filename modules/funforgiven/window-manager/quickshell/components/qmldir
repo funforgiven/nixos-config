@@ -7,4 +7,5 @@ IconButton 1.0 IconButton.qml
 MaterialSlider 1.0 MaterialSlider.qml
 StatusChip 1.0 StatusChip.qml
 Surface 1.0 Surface.qml
+TintedIcon 1.0 TintedIcon.qml
 Tooltip 1.0 Tooltip.qml
