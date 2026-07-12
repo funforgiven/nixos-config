@@ -12,6 +12,7 @@ _: {
         steam = {
           enable = true;
           extest.enable = true;
+          localNetworkGameTransfers.openFirewall = true;
           protontricks.enable = true;
         };
 
