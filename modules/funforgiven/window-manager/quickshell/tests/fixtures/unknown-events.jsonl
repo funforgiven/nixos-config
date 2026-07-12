@@ -1,0 +1,7 @@
+{"Ok":"Handled"}
+{"OverviewOpenedOrClosed":{"is_open":true}}
+{"CastsChanged":{"casts":[]}}
+{"ScreenshotCaptured":{"path":null}}
+{"KeyboardLayoutsChanged":{"keyboard_layouts":{"names":["Turkish"],"current_idx":0}}}
+{"KeyboardLayoutSwitched":{"idx":0}}
+{"EventAddedAfterThisReducer":{"new_field":{"nested":true}}}

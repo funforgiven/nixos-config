@@ -1,0 +1,4 @@
+module FunforgivenShell.Dock
+Dock 1.0 Dock.qml
+DockApp 1.0 DockApp.qml
+DockLauncher 1.0 DockLauncher.qml

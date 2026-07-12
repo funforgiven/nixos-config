@@ -1,0 +1,8 @@
+module FunforgivenShell.Mixer
+ChannelCard 1.0 ChannelCard.qml
+ChannelGain 1.0 ChannelGain.qml
+DragSession 1.0 DragSession.qml
+MixerPopup 1.0 MixerPopup.qml
+OutputPicker 1.0 OutputPicker.qml
+StreamCard 1.0 StreamCard.qml
+StreamChildren 1.0 StreamChildren.qml

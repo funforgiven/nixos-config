@@ -1,0 +1,11 @@
+/.codex-doc-cache/
+/.direnv/
+/.envrc
+/.pre-commit-config.yaml
+/hardware-configuration.nix
+/result
+/result-*
+/secrets/*.age
+/secrets/*.hash
+/secrets/*.key
+/secrets/*.pem

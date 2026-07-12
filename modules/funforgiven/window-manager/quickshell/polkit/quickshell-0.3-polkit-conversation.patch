@@ -1,0 +1,709 @@
+diff -uNr a/src/services/polkit/agentimpl.cpp b/src/services/polkit/agentimpl.cpp
+--- a/src/services/polkit/agentimpl.cpp	2026-07-10 02:26:38.461099100 +0300
++++ b/src/services/polkit/agentimpl.cpp	2026-07-10 02:55:50.517069109 +0300
+@@ -7,6 +7,7 @@
+ #include <qloggingcategory.h>
+ #include <qobject.h>
+ #include <qproperty.h>
++#include <qtimer.h>
+ #include <qtmetamacros.h>
+ 
+ #include "../../core/generation.hpp"
+@@ -31,7 +32,10 @@
+ 	qs_polkit_agent_register(this->listener.get(), utf8Path.constData());
+ }
+ 
+-PolkitAgentImpl::~PolkitAgentImpl() { this->cancelAllRequests("PolkitAgent is being destroyed"); }
++PolkitAgentImpl::~PolkitAgentImpl() {
++	this->cancelAllRequests("PolkitAgent is being destroyed");
++	qs_polkit_agent_detach(this->listener.get());
++}
+ 
+ void PolkitAgentImpl::cancelAllRequests(const QString& reason) {
+ 	for (; !this->queuedRequests.empty(); this->queuedRequests.pop_back()) {
+@@ -106,7 +110,7 @@
+ 
+ 	this->queuedRequests.emplace_back(request);
+ 
+-	if (this->queuedRequests.size() == 1) {
++	if (!this->bActiveFlow.value()) {
+ 		this->activateAuthenticationRequest();
+ 	}
+ }
+@@ -121,60 +125,70 @@
+ 	           it != this->queuedRequests.end())
+ 	{
+ 		qCDebug(logPolkit) << "removing queued authentication request for action" << (*it)->actionId;
+-		(*it)->cancel("Authentication request was cancelled");
+-		delete (*it);
++		auto* cancelledRequest = *it;
++		cancelledRequest->cancel("Authentication request was cancelled");
+ 		this->queuedRequests.erase(it);
++		QTimer::singleShot(0, [cancelledRequest]() { delete cancelledRequest; });
+ 	} else {
+ 		qCWarning(logPolkit) << "the cancelled request was not found in the queue.";
+ 	}
+ }
+ 
+ void PolkitAgentImpl::activateAuthenticationRequest() {
+-	if (this->queuedRequests.empty()) return;
+-
+-	AuthRequest* req = this->queuedRequests.front();
+-	this->queuedRequests.pop_front();
+-	qCDebug(logPolkit) << "activating authentication request for action" << req->actionId
+-	                   << ", cookie: " << req->cookie;
++	if (this->bActiveFlow.value()) return;
+ 
++	AuthRequest* req = nullptr;
+ 	QList<Identity*> identities;
+-	for (auto& identity: req->identities) {
+-		auto* obj = Identity::fromPolkitIdentity(identity);
+-		if (obj) identities.append(obj);
+-	}
+-	if (identities.isEmpty()) {
++
++	while (!this->queuedRequests.empty()) {
++		req = this->queuedRequests.front();
++		this->queuedRequests.pop_front();
++		qCDebug(logPolkit) << "activating authentication request for action" << req->actionId
++		                   << ", cookie: " << req->cookie;
++
++		for (auto& identity: req->identities) {
++			auto* obj = Identity::fromPolkitIdentity(identity);
++			if (obj && !obj->isGroup()) {
++				identities.append(obj);
++			} else {
++				delete obj;
++			}
++		}
++
++		if (!identities.isEmpty()) break;
++
+ 		qCWarning(
+ 		    logPolkit
+ 		) << "no supported identities available for authentication request, cancelling.";
+ 		req->cancel("Error requesting authentication: no supported identities available.");
+-		delete req;
+-		return;
++		auto* unsupportedRequest = req;
++		QTimer::singleShot(0, [unsupportedRequest]() { delete unsupportedRequest; });
++		req = nullptr;
+ 	}
+ 
+-	this->bActiveFlow = new AuthFlow(req, std::move(identities));
++	if (!req) return;
++
++	auto* flow = new AuthFlow(req, std::move(identities));
++	this->bActiveFlow = flow;
+ 
+ 	QObject::connect(
+-	    this->bActiveFlow.value(),
++	    flow,
+ 	    &AuthFlow::isCompletedChanged,
+ 	    this,
+-	    &PolkitAgentImpl::finishAuthenticationRequest
++	    [this, flow]() { this->finishAuthenticationRequest(flow); }
+ 	);
+ 
+ 	emit this->qmlAgent->authenticationRequestStarted();
+ }
+ 
+-void PolkitAgentImpl::finishAuthenticationRequest() {
+-	if (!this->bActiveFlow.value()) return;
++void PolkitAgentImpl::finishAuthenticationRequest(AuthFlow* flow) {
++	if (!flow || this->bActiveFlow.value() != flow || !flow->isCompleted().value()) return;
+ 
+-	qCDebug(logPolkit) << "finishing authentication request for action"
+-	                   << this->bActiveFlow.value()->actionId();
++	qCDebug(logPolkit) << "finishing authentication request for action" << flow->actionId();
+ 
+-	this->bActiveFlow.value()->deleteLater();
++	flow->deleteLater();
++	this->bActiveFlow = nullptr;
+ 
+-	if (!this->queuedRequests.empty()) {
+-		this->activateAuthenticationRequest();
+-	} else {
+-		this->bActiveFlow = nullptr;
+-	}
++	this->activateAuthenticationRequest();
+ }
+ } // namespace qs::service::polkit
+diff -uNr a/src/services/polkit/agentimpl.hpp b/src/services/polkit/agentimpl.hpp
+--- a/src/services/polkit/agentimpl.hpp	2026-07-10 02:26:38.459099100 +0300
++++ b/src/services/polkit/agentimpl.hpp	2026-07-10 02:28:03.651931283 +0300
+@@ -50,7 +50,7 @@
+ 	/// Start handling of the next authentication request in the queue.
+ 	void activateAuthenticationRequest();
+ 	/// Finalize and remove the current authentication request.
+-	void finishAuthenticationRequest();
++	void finishAuthenticationRequest(AuthFlow* flow);
+ 
+ 	GObjectRef<QsPolkitAgent> listener;
+ 	PolkitAgent* qmlAgent = nullptr;
+diff -uNr a/src/services/polkit/flow.cpp b/src/services/polkit/flow.cpp
+--- a/src/services/polkit/flow.cpp	2026-07-10 02:26:38.462099100 +0300
++++ b/src/services/polkit/flow.cpp	2026-07-10 02:58:55.610022421 +0300
+@@ -7,6 +7,7 @@
+ #include <qobject.h>
+ #include <qproperty.h>
+ #include <qqmlinfo.h>
++#include <qtimer.h>
+ #include <qtmetamacros.h>
+ 
+ #include "../../core/logcat.hpp"
+@@ -44,13 +45,27 @@
+ 		qmlWarning(this) << "Cannot set selected identity to null.";
+ 		return;
+ 	}
++
++	Qt::beginPropertyUpdateGroup();
+ 	this->bSelectedIdentity = identity;
+-	this->currentSession->cancel();
++	this->bIsResponseRequired = false;
++	this->bInputPrompt = QString();
++	this->bResponseVisible = false;
++	this->bSupplementaryMessage = QString();
++	this->bSupplementaryIsError = false;
++	this->bCanRetry = false;
++	Qt::endPropertyUpdateGroup();
++	this->consecutivePrePromptFailures = 0;
++
++	if (this->currentSession) {
++		QObject::disconnect(this->currentSession, nullptr, this, nullptr);
++		this->currentSession->cancel();
++	}
+ 	this->setupSession();
+ }
+ 
+ void AuthFlow::cancelFromAgent() {
+-	if (!this->currentSession) return;
++	if (!this->currentSession || this->bIsCompleted.value() || this->bIsCancelled.value()) return;
+ 
+ 	qCDebug(logPolkitState) << "cancelling authentication request from agent";
+ 
+@@ -58,7 +73,13 @@
+ 	// performs property updates.
+ 	Qt::beginPropertyUpdateGroup();
+ 	this->bIsCancelled = true;
++	this->bIsResponseRequired = false;
++	this->bInputPrompt = QString();
++	this->bResponseVisible = false;
++	this->bCanRetry = false;
+ 	this->currentSession->cancel();
++	this->bIsCompleted = true;
++	this->bIsSuccessful = false;
+ 	Qt::endPropertyUpdateGroup();
+ 
+ 	emit this->authenticationRequestCancelled();
+@@ -71,17 +92,18 @@
+ 
+ 	qCDebug(logPolkitState) << "submitting response to authentication request";
+ 
+-	this->currentSession->respond(value);
+-
+ 	Qt::beginPropertyUpdateGroup();
+ 	this->bIsResponseRequired = false;
+ 	this->bInputPrompt = QString();
+ 	this->bResponseVisible = false;
++	this->bCanRetry = false;
+ 	Qt::endPropertyUpdateGroup();
++
++	this->currentSession->respond(value);
+ }
+ 
+ void AuthFlow::cancelAuthenticationRequest() {
+-	if (!this->currentSession) return;
++	if (!this->currentSession || this->bIsCompleted.value() || this->bIsCancelled.value()) return;
+ 
+ 	qCDebug(logPolkitState) << "cancelling authentication request by user request";
+ 
+@@ -89,14 +111,34 @@
+ 	// performs property updates.
+ 	Qt::beginPropertyUpdateGroup();
+ 	this->bIsCancelled = true;
++	this->bIsResponseRequired = false;
++	this->bInputPrompt = QString();
++	this->bResponseVisible = false;
++	this->bCanRetry = false;
+ 	this->currentSession->cancel();
++	this->bIsCompleted = true;
++	this->bIsSuccessful = false;
+ 	Qt::endPropertyUpdateGroup();
+ 
+ 	this->mRequest->cancel("Authentication request cancelled by user.");
+ }
+ 
++void AuthFlow::retryAuthentication() {
++	if (!this->bCanRetry.value() || this->bIsCompleted.value() || this->bIsCancelled.value()) return;
++
++	Qt::beginPropertyUpdateGroup();
++	this->bCanRetry = false;
++	this->bSupplementaryMessage = QString();
++	this->bSupplementaryIsError = false;
++	Qt::endPropertyUpdateGroup();
++	this->consecutivePrePromptFailures = 0;
++	this->setupSession();
++}
++
+ void AuthFlow::setupSession() {
+ 	delete this->currentSession;
++	this->sessionGeneration += 1;
++	this->sessionRequestedResponse = false;
+ 
+ 	qCDebug(logPolkitState) << "setting up session for identity"
+ 	                        << this->bSelectedIdentity.value()->name();
+@@ -114,14 +156,19 @@
+ }
+ 
+ void AuthFlow::request(const QString& message, bool echo) {
++	this->sessionRequestedResponse = true;
+ 	Qt::beginPropertyUpdateGroup();
+ 	this->bIsResponseRequired = true;
++	this->bCanRetry = false;
+ 	this->bInputPrompt = message;
+ 	this->bResponseVisible = echo;
+ 	Qt::endPropertyUpdateGroup();
+ }
+ 
+ void AuthFlow::completed(bool gainedAuthorization) {
++	if (this->bIsCompleted.value() || this->bCanRetry.value()) return;
++
++	const auto completedGeneration = this->sessionGeneration;
+ 	qCDebug(logPolkitState) << "authentication session completed, gainedAuthorization ="
+ 	                        << gainedAuthorization << ", isCancelled =" << this->bIsCancelled.value();
+ 
+@@ -140,10 +187,33 @@
+ 		this->bIsSuccessful = false;
+ 		Qt::endPropertyUpdateGroup();
+ 	} else {
++		if (this->sessionRequestedResponse) {
++			this->consecutivePrePromptFailures = 0;
++		} else {
++			this->consecutivePrePromptFailures += 1;
++		}
++
+ 		this->bFailed = true;
+ 		emit this->authenticationFailed();
+ 
+-		this->setupSession();
++		if (this->consecutivePrePromptFailures >= 3) {
++			Qt::beginPropertyUpdateGroup();
++			this->bSupplementaryMessage = QStringLiteral(
++			    "Authentication could not start for the selected identity."
++			);
++			this->bSupplementaryIsError = true;
++			this->bCanRetry = true;
++			Qt::endPropertyUpdateGroup();
++			return;
++		}
++
++		QTimer::singleShot(0, this, [this, completedGeneration]() {
++			if (!this->bIsCompleted.value() && !this->bIsCancelled.value()
++			    && this->sessionGeneration == completedGeneration)
++			{
++				this->setupSession();
++			}
++		});
+ 	}
+ }
+ 
+diff -uNr a/src/services/polkit/flow.hpp b/src/services/polkit/flow.hpp
+--- a/src/services/polkit/flow.hpp	2026-07-10 02:55:32.371074512 +0300
++++ b/src/services/polkit/flow.hpp	2026-07-10 02:58:03.532035326 +0300
+@@ -42,7 +42,7 @@
+ 
+ 	/// The list of identities that may be used to authenticate.
+ 	///
+-	/// Each identity may be a user or a group. You may select any of them to
++	/// Each identity is a Unix user supported by PolkitAgentSession. You may select any of them to
+ 	/// authenticate by setting @@selectedIdentity. By default, the first identity
+ 	/// in the list is selected.
+ 	Q_PROPERTY(QList<Identity*> identities READ identities CONSTANT);
+@@ -80,6 +80,9 @@
+ 	/// Indicates whether the current authentication request was cancelled.
+ 	Q_PROPERTY(bool isCancelled READ default NOTIFY isCancelledChanged BINDABLE isCancelled);
+ 
++	/// Indicates that a session failed before prompting and may be retried explicitly.
++	Q_PROPERTY(bool canRetry READ default NOTIFY canRetryChanged BINDABLE canRetry);
++
+ 	/// Indicates whether an authentication attempt has failed at least once during this authentication flow.
+ 	Q_PROPERTY(bool failed READ default NOTIFY failedChanged BINDABLE failed);
+ 	// clang-format on
+@@ -95,6 +98,8 @@
+ 	Q_INVOKABLE void submit(const QString& value);
+ 	/// Cancel the ongoing authentication request from the user side.
+ 	Q_INVOKABLE void cancelAuthenticationRequest();
++	/// Retry after repeated failures to start an authentication session.
++	Q_INVOKABLE void retryAuthentication();
+ 
+ 	[[nodiscard]] const QString& message() const { return this->mRequest->message; };
+ 	[[nodiscard]] const QString& iconName() const { return this->mRequest->iconName; };
+@@ -115,6 +120,7 @@
+ 	[[nodiscard]] QBindable<bool> isCompleted() { return &this->bIsCompleted; };
+ 	[[nodiscard]] QBindable<bool> isSuccessful() { return &this->bIsSuccessful; };
+ 	[[nodiscard]] QBindable<bool> isCancelled() { return &this->bIsCancelled; };
++	[[nodiscard]] QBindable<bool> canRetry() { return &this->bCanRetry; };
+ 	[[nodiscard]] QBindable<bool> failed() { return &this->bFailed; };
+ 
+ 	[[nodiscard]] AuthRequest* authRequest() const { return this->mRequest; };
+@@ -146,6 +152,7 @@
+ 	void isCompletedChanged();
+ 	void isSuccessfulChanged();
+ 	void isCancelledChanged();
++	void canRetryChanged();
+ 	void failedChanged();
+ 
+ private slots:
+@@ -162,6 +169,9 @@
+ 	Session* currentSession = nullptr;
+ 	AuthRequest* mRequest = nullptr;
+ 	QList<Identity*> mIdentities;
++	quint64 sessionGeneration = 0;
++	quint8 consecutivePrePromptFailures = 0;
++	bool sessionRequestedResponse = false;
+ 
+ 	// clang-format off
+ 	Q_OBJECT_BINDABLE_PROPERTY(AuthFlow, Identity*, bSelectedIdentity, &AuthFlow::selectedIdentityChanged);
+@@ -173,6 +183,7 @@
+ 	Q_OBJECT_BINDABLE_PROPERTY(AuthFlow, bool, bIsCompleted, &AuthFlow::isCompletedChanged);
+ 	Q_OBJECT_BINDABLE_PROPERTY(AuthFlow, bool, bIsSuccessful, &AuthFlow::isSuccessfulChanged);
+ 	Q_OBJECT_BINDABLE_PROPERTY(AuthFlow, bool, bIsCancelled, &AuthFlow::isCancelledChanged);
++	Q_OBJECT_BINDABLE_PROPERTY(AuthFlow, bool, bCanRetry, &AuthFlow::canRetryChanged);
+ 	Q_OBJECT_BINDABLE_PROPERTY(AuthFlow, bool, bFailed, &AuthFlow::failedChanged);
+ 	// clang-format on
+ };
+diff -uNr a/src/services/polkit/listener.cpp b/src/services/polkit/listener.cpp
+--- a/src/services/polkit/listener.cpp	2026-07-10 02:39:30.844455457 +0300
++++ b/src/services/polkit/listener.cpp	2026-07-10 02:57:54.129037671 +0300
+@@ -1,5 +1,6 @@
+ #include "listener.hpp"
+ #include <memory>
++#include <mutex>
+ #include <string>
+ #include <unordered_set>
+ #include <utility>
+@@ -25,6 +26,15 @@
+ 
+ using qs::service::polkit::GObjectRef;
+ 
++namespace qs::service::polkit {
++struct CancellationState {
++	std::mutex mutex;
++	AuthRequest* request = nullptr;
++};
++} // namespace qs::service::polkit
++
++using CancellationStatePtr = std::shared_ptr<qs::service::polkit::CancellationState>;
++
+ // This is mostly GObject code, we follow their naming conventions for improved
+ // clarity and to mark it as such. Additionally, many methods need to be static
+ // to conform with the expected declarations.
+@@ -35,6 +45,7 @@
+ 
+ 	qs::service::polkit::ListenerCb* cb;
+ 	gpointer registration_handle;
++	guint64 registration_generation;
+ };
+ 
+ G_DEFINE_TYPE(QsPolkitAgent, qs_polkit_agent, POLKIT_AGENT_TYPE_LISTENER)
+@@ -58,9 +69,13 @@
+ static void qs_polkit_agent_init(QsPolkitAgent* self) {
+ 	self->cb = nullptr;
+ 	self->registration_handle = nullptr;
++	self->registration_generation = 0;
+ }
+ 
+ static void qs_polkit_agent_finalize(GObject* object) {
++	auto* self = QS_POLKIT_AGENT(object);
++	qs_polkit_agent_detach(self);
++
+ 	if (G_OBJECT_CLASS(qs_polkit_agent_parent_class))
+ 		G_OBJECT_CLASS(qs_polkit_agent_parent_class)->finalize(object);
+ }
+@@ -83,17 +98,26 @@
+ struct RegisterCbData {
+ 	GObjectRef<QsPolkitAgent> agent;
+ 	std::string path;
++	guint64 generation;
+ };
+ 
+ static void qs_polkit_agent_register_cb(GObject* /*unused*/, GAsyncResult* res, gpointer userData);
+ void qs_polkit_agent_register(QsPolkitAgent* agent, const char* path) {
++	if (agent->cb == nullptr) return;
++
+ 	if (path == nullptr || *path == '\0') {
+ 		qCWarning(logPolkitListener) << "cannot register listener without a path set.";
+ 		agent->cb->registerComplete(false);
+ 		return;
+ 	}
+ 
+-	auto* data = new RegisterCbData {.agent = GObjectRef(agent), .path = path};
++	qs_polkit_agent_unregister(agent);
++	auto generation = ++agent->registration_generation;
++	auto* data = new RegisterCbData {
++	    .agent = GObjectRef(agent),
++	    .path = path,
++	    .generation = generation
++	};
+ 	polkit_unix_session_new_for_process(getpid(), nullptr, &qs_polkit_agent_register_cb, data);
+ }
+ 
+@@ -102,12 +126,18 @@
+ 
+ 	GError* error = nullptr;
+ 	auto* subject = polkit_unix_session_new_for_process_finish(res, &error);
++	if (data->generation != data->agent->registration_generation || data->agent->cb == nullptr) {
++		if (subject != nullptr) g_object_unref(subject);
++		g_clear_error(&error);
++		return;
++	}
+ 
+ 	if (subject == nullptr || error != nullptr) {
+ 		qCWarning(logPolkitListener) << "failed to create subject for listener:"
+ 		                             << (error ? error->message : "<unknown error>");
++		if (subject != nullptr) g_object_unref(subject);
+ 		g_clear_error(&error);
+-		data->agent->cb->registerComplete(false);
++		if (data->agent->cb != nullptr) data->agent->cb->registerComplete(false);
+ 		return;
+ 	}
+ 
+@@ -122,26 +152,63 @@
+ 
+ 	g_object_unref(subject);
+ 
+-	if (error != nullptr) {
+-		qCWarning(logPolkitListener) << "failed to register listener:" << error->message;
++	if (data->agent->registration_handle == nullptr || error != nullptr) {
++		qCWarning(logPolkitListener) << "failed to register listener:"
++		                             << (error ? error->message : "<unknown error>");
+ 		g_clear_error(&error);
+-		data->agent->cb->registerComplete(false);
++		if (data->agent->cb != nullptr) data->agent->cb->registerComplete(false);
+ 		return;
+ 	}
+ 
+-	data->agent->cb->registerComplete(true);
++	if (data->agent->cb != nullptr) {
++		data->agent->cb->registerComplete(true);
++	} else {
++		qs_polkit_agent_unregister(data->agent.get());
++	}
+ }
+ 
+ void qs_polkit_agent_unregister(QsPolkitAgent* agent) {
++	agent->registration_generation += 1;
+ 	if (agent->registration_handle != nullptr) {
+ 		polkit_agent_listener_unregister(agent->registration_handle);
+ 		agent->registration_handle = nullptr;
+ 	}
+ }
+ 
++void qs_polkit_agent_detach(QsPolkitAgent* agent) {
++	qs_polkit_agent_unregister(agent);
++	agent->cb = nullptr;
++}
++
++static void cancellation_state_destroy(gpointer userData) {
++	delete static_cast<CancellationStatePtr*>(userData);
++}
++
++static gboolean dispatch_authentication_cancelled(gpointer userData) {
++	auto& state = *static_cast<CancellationStatePtr*>(userData);
++	qs::service::polkit::AuthRequest* request = nullptr;
++
++	{
++		const std::lock_guard lock(state->mutex);
++		request = state->request;
++	}
++
++	if (request != nullptr && request->cb != nullptr) request->cb->cancelAuthentication(request);
++	return G_SOURCE_REMOVE;
++}
++
+ static void authentication_cancelled_cb(GCancellable* /*unused*/, gpointer userData) {
+-	auto* request = static_cast<qs::service::polkit::AuthRequest*>(userData);
+-	request->cb->cancelAuthentication(request);
++	auto& state = *static_cast<CancellationStatePtr*>(userData);
++
++	// GCancellable may emit from any thread, including synchronously during
++	// g_cancellable_connect(). Never touch Qt-owned request/queue state here.
++	// The idle source always runs after this callback on the default main context.
++	g_idle_add_full(
++	    G_PRIORITY_DEFAULT,
++	    &dispatch_authentication_cancelled,
++	    new CancellationStatePtr(state),
++	    &cancellation_state_destroy
++	);
+ }
+ 
+ static void initiate_authentication(
+@@ -159,6 +226,17 @@
+ 	auto* self = QS_POLKIT_AGENT(listener);
+ 
+ 	auto* asyncResult = g_task_new(reinterpret_cast<GObject*>(self), nullptr, callback, userData);
++	if (self->cb == nullptr) {
++		g_task_return_new_error(
++		    asyncResult,
++		    POLKIT_ERROR,
++		    POLKIT_ERROR_CANCELLED,
++		    "%s",
++		    "Authentication agent is no longer available."
++		);
++		g_object_unref(asyncResult);
++		return;
++	}
+ 
+ 	// Identities may be duplicated, so we use the hash to filter them out.
+ 	std::unordered_set<guint> identitySet;
+@@ -184,21 +262,30 @@
+ 	    .identities = std::move(identityVector),
+ 
+ 	    .task = asyncResult,
+-	    .cancellable = cancellable,
++	    .cancellable = cancellable != nullptr
++	        ? G_CANCELLABLE(g_object_ref(cancellable))
++	        : nullptr,
+ 	    .handlerId = 0,
++	    .cancellationState = nullptr,
+ 	    .cb = self->cb
+ 	};
++	request->cancellationState = std::make_shared<qs::service::polkit::CancellationState>();
++	request->cancellationState->request = request;
+ 
+-	if (cancellable != nullptr) {
++	// Dispatch first so an already-cancelled GCancellable can find the request
++	// in either the active flow or the waiting queue when connect calls back
++	// synchronously. AgentImpl defers every deletion reachable from this call.
++	self->cb->initiateAuthentication(request);
++
++	if (request->isPending() && request->cancellable != nullptr) {
++		auto* callbackState = new CancellationStatePtr(request->cancellationState);
+ 		request->handlerId = g_cancellable_connect(
+-		    cancellable,
++		    request->cancellable,
+ 		    reinterpret_cast<GCallback>(authentication_cancelled_cb),
+-		    request,
+-		    nullptr
++		    callbackState,
++		    &cancellation_state_destroy
+ 		);
+ 	}
+-
+-	self->cb->initiateAuthentication(request);
+ }
+ 
+ static gboolean initiate_authentication_finish(
+@@ -214,17 +301,62 @@
+ // they are logically non-const since they modify the state of the
+ // authentication request. Therefore, we do not mark them as const.
+ // NOLINTBEGIN(readability-make-member-function-const)
+-void AuthRequest::complete() { g_task_return_boolean(this->task, true); }
++AuthRequest::~AuthRequest() {
++	this->disconnectCancellable();
++	if (this->task != nullptr) {
++		auto* task = std::exchange(this->task, nullptr);
++		g_task_return_new_error(
++		    task,
++		    POLKIT_ERROR,
++		    POLKIT_ERROR_CANCELLED,
++		    "%s",
++		    "Authentication request was destroyed before completion."
++		);
++		g_object_unref(task);
++	}
++}
++
++void AuthRequest::detachCancellationState() {
++	auto state = std::exchange(this->cancellationState, nullptr);
++	if (!state) return;
++
++	const std::lock_guard lock(state->mutex);
++	if (state->request == this) state->request = nullptr;
++}
++
++void AuthRequest::disconnectCancellable() {
++	this->detachCancellationState();
++	auto* cancellable = std::exchange(this->cancellable, nullptr);
++	auto handlerId = std::exchange(this->handlerId, 0UL);
++	if (cancellable == nullptr) return;
++
++	if (handlerId != 0) g_cancellable_disconnect(cancellable, handlerId);
++	g_object_unref(cancellable);
++}
++
++void AuthRequest::complete() {
++	if (this->task == nullptr) return;
++
++	this->disconnectCancellable();
++	auto* task = std::exchange(this->task, nullptr);
++	g_task_return_boolean(task, true);
++	g_object_unref(task);
++}
+ 
+ void AuthRequest::cancel(const QString& reason) {
++	if (this->task == nullptr) return;
++
++	this->disconnectCancellable();
++	auto* task = std::exchange(this->task, nullptr);
+ 	auto utf8Reason = reason.toUtf8();
+ 	g_task_return_new_error(
+-	    this->task,
++	    task,
+ 	    POLKIT_ERROR,
+ 	    POLKIT_ERROR_CANCELLED,
+ 	    "%s",
+ 	    utf8Reason.constData()
+ 	);
++	g_object_unref(task);
+ }
+ // NOLINTEND(readability-make-member-function-const)
+ } // namespace qs::service::polkit
+diff -uNr a/src/services/polkit/listener.hpp b/src/services/polkit/listener.hpp
+--- a/src/services/polkit/listener.hpp	2026-07-10 02:39:30.842455457 +0300
++++ b/src/services/polkit/listener.hpp	2026-07-10 02:53:45.257110104 +0300
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include <memory>
+ #include <qstring.h>
+ 
+ #define POLKIT_AGENT_I_KNOW_API_IS_SUBJECT_TO_CHANGE
+@@ -15,6 +16,7 @@
+ 
+ namespace qs::service::polkit {
+ class ListenerCb;
++struct CancellationState;
+ //! All state that comes in from PolKit about an authentication request.
+ struct AuthRequest {
+ 	//! The action ID that this session is for.
+@@ -34,11 +36,19 @@
+ 	GCancellable* cancellable;
+ 	//! Callback handler ID for the cancellable.
+ 	gulong handlerId;
++	//! Thread-safe bridge from GCancellable into the main-context request owner.
++	std::shared_ptr<CancellationState> cancellationState;
+ 	//! Callbacks for the listener
+ 	ListenerCb* cb;
+ 
++	~AuthRequest();
++	[[nodiscard]] bool isPending() const { return this->task != nullptr; }
+ 	void complete();
+ 	void cancel(const QString& reason);
++
++private:
++	void detachCancellationState();
++	void disconnectCancellable();
+ };
+ 
+ //! Callback interface for PolkitAgent listener events.
+@@ -69,6 +79,7 @@
+ QsPolkitAgent* qs_polkit_agent_new(qs::service::polkit::ListenerCb* cb);
+ void qs_polkit_agent_register(QsPolkitAgent* agent, const char* path);
+ void qs_polkit_agent_unregister(QsPolkitAgent* agent);
++void qs_polkit_agent_detach(QsPolkitAgent* agent);
+ 
+ // NOLINTEND(readability-identifier-naming)
+ 
+

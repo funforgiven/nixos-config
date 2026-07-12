@@ -1,0 +1,10 @@
+module FunforgivenShell.Components
+ActionButton 1.0 ActionButton.qml
+AppIcon 1.0 AppIcon.qml
+DragAvatar 1.0 DragAvatar.qml
+FocusRing 1.0 FocusRing.qml
+IconButton 1.0 IconButton.qml
+MaterialSlider 1.0 MaterialSlider.qml
+StatusChip 1.0 StatusChip.qml
+Surface 1.0 Surface.qml
+Tooltip 1.0 Tooltip.qml

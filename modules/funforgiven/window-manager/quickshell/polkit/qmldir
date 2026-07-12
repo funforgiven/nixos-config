@@ -1,0 +1,3 @@
+module FunforgivenShell.Polkit
+singleton PolkitOverlay 1.0 PolkitOverlay.qml
+PolkitDialog 1.0 PolkitDialog.qml

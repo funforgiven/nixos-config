@@ -1,0 +1,4 @@
+module FunforgivenShell.Launcher
+singleton Launcher 1.0 Launcher.qml
+LauncherResult 1.0 LauncherResult.qml
+LauncherSearchField 1.0 LauncherSearchField.qml

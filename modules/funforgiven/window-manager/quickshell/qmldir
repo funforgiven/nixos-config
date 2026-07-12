@@ -1,0 +1,3 @@
+module FunforgivenShell
+singleton Theme 1.0 generated/Theme.qml
+singleton ShellConfig 1.0 generated/ShellConfig.qml

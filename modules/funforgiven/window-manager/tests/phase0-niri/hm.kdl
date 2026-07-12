@@ -1,0 +1,141 @@
+input {
+    keyboard {
+        xkb {
+            layout "tr"
+            model ""
+            rules ""
+            variant ""
+        }
+        repeat-delay 300
+        repeat-rate 50
+        track-layout "global"
+        numlock
+    }
+    touchpad {
+        tap
+        natural-scroll
+        accel-profile "flat"
+    }
+    mouse { accel-profile "flat"; }
+    trackpoint { accel-profile "flat"; }
+}
+output "ASUSTek COMPUTER INC PG27UCDM T1LMAS011449" {
+    scale 1.500000
+    transform "normal"
+    position x=2560 y=560
+    mode "3840x2160@240.000000"
+    variable-refresh-rate on-demand=true
+}
+output "ASUSTek COMPUTER INC XG27UCS S4LMTF194498" {
+    scale 1.500000
+    transform "90"
+    position x=5120 y=-490
+    mode "3840x2160@160.001000"
+    variable-refresh-rate on-demand=true
+}
+output "ASUSTek COMPUTER INC XG27UCS S4LMTF194503" {
+    scale 1.500000
+    focus-at-startup
+    transform "normal"
+    position x=0 y=100
+    mode "3840x2160@160.001000"
+    variable-refresh-rate on-demand=true
+}
+screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+prefer-no-csd
+layout {
+    gaps 4
+    struts {
+        left 0
+        right 0
+        top 0
+        bottom 0
+    }
+    focus-ring { off; }
+    border { width 2; }
+    default-column-width
+    center-focused-column "never"
+}
+cursor {
+    xcursor-theme "Adwaita"
+    xcursor-size 24
+    hide-when-typing
+}
+environment {
+    "DMS_DEFAULT_LAUNCH_PREFIX" "/nix/store/hsgfz49glp4biz6hh100nribrhf6b08x-uwsm-0.26.5/bin/uwsm-app --"
+    "MOZ_ENABLE_WAYLAND" "1"
+    "NIXOS_OZONE_WL" "1"
+    PATH "/run/wrappers/bin:/etc/profiles/per-user/funforgiven/bin:/run/current-system/sw/bin"
+    "QT_AUTO_SCREEN_SCALE_FACTOR" "1"
+    "QT_QPA_PLATFORM" "wayland;xcb"
+    "QT_QPA_PLATFORMTHEME" "qt5ct"
+    "QT_QPA_PLATFORMTHEME_QT6" "qt6ct"
+    "QT_WAYLAND_DISABLE_WINDOWDECORATION" "1"
+    "XDG_DATA_DIRS" "/etc/profiles/per-user/funforgiven/share:/run/current-system/sw/share"
+}
+binds {
+    Mod+Ctrl+1 { move-column-to-workspace 1; }
+    Mod+Ctrl+2 { move-column-to-workspace 2; }
+    Mod+Ctrl+3 { move-column-to-workspace 3; }
+    Mod+Ctrl+4 { move-column-to-workspace 4; }
+    Mod+Ctrl+5 { move-column-to-workspace 5; }
+    Mod+Ctrl+6 { move-column-to-workspace 6; }
+    Mod+Ctrl+7 { move-column-to-workspace 7; }
+    Mod+Ctrl+8 { move-column-to-workspace 8; }
+    Mod+Ctrl+9 { move-column-to-workspace 9; }
+    Mod+Ctrl+Shift+F { toggle-windowed-fullscreen; }
+    Mod+Return { spawn "/nix/store/znlba1clza8n1d0xvrzb8na8xgd6n9gv-foot-1.27.0/bin/foot"; }
+}
+workspace "discord" { open-on-output "ASUSTek COMPUTER INC XG27UCS S4LMTF194503"; }
+workspace "telegram" { open-on-output "ASUSTek COMPUTER INC XG27UCS S4LMTF194498"; }
+workspace "steam" { open-on-output "ASUSTek COMPUTER INC PG27UCDM T1LMAS011449"; }
+workspace "passwords" { open-on-output "ASUSTek COMPUTER INC XG27UCS S4LMTF194503"; }
+spawn-at-startup "/nix/store/b1f1frc7z58kr4g9j703dzzklshx6n4q-dms-shell-1.5.0+date=2026-07-08_bdfd565/bin/dms" "run"
+window-rule {
+    match app-id="(?i)^discord$" at-startup=true
+    open-on-workspace "discord"
+    open-maximized true
+}
+window-rule {
+    match app-id="^org\\.telegram\\.desktop$" at-startup=true
+    exclude app-id="^org\\.telegram\\.desktop$" title="^Media viewer$"
+    open-on-workspace "telegram"
+    open-maximized true
+}
+window-rule {
+    match app-id="^org\\.telegram\\.desktop$" title="^Media viewer$"
+    open-floating true
+}
+window-rule {
+    match app-id="^steam$" at-startup=true title="^Steam$"
+    open-on-workspace "steam"
+    open-maximized true
+}
+window-rule {
+    match app-id="^steam$" title="^notificationtoasts"
+    open-floating true
+    open-focused false
+}
+window-rule {
+    match app-id="(?i)^(1password|onepassword)$"
+    open-on-workspace "passwords"
+    open-maximized true
+    block-out-from "screencast"
+}
+window-rule {
+    match app-id="^firefox$" title="^Picture-in-Picture$"
+    default-column-width { fixed 480; }
+    default-window-height { fixed 270; }
+    open-floating true
+    default-floating-position relative-to="bottom-left" x=32 y=32
+}
+window-rule {
+    match app-id="^mpv$"
+    match app-id="^steam_app_.*"
+    match app-id="^gamescope$"
+    match app-id="^lutris$"
+    match app-id="^net\\.lutris\\..*"
+    match app-id="^com\\.heroicgameslauncher\\.hgl$"
+    variable-refresh-rate true
+}
+xwayland-satellite { path "/nix/store/v0hfwyki0ycx4za8x1l6yv2clg2l2785-xwayland-satellite-unstable-2026-06-12-8575d0e/bin/xwayland-satellite"; }

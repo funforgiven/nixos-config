@@ -1,0 +1,46 @@
+diff --git a/src/input/mod.rs b/src/input/mod.rs
+--- a/src/input/mod.rs
++++ b/src/input/mod.rs
+@@ -873,7 +873,20 @@ impl State {
+                 let window = self.niri.layout.windows().find(|(_, m)| m.id().get() == id);
+                 let window = window.map(|(_, m)| m.window.clone());
+                 if let Some(window) = window {
+-                    self.focus_window(&window);
++                    // FocusWindow(id) is an IPC-only exact-window action used
++                    // by taskbars. Match foreign-toplevel activation semantics
++                    // so the window is revealed and focused without moving the
++                    // pointer away from the layer-shell surface that invoked it.
++                    let pointer = self.niri.seat.get_pointer().unwrap();
++                    let pointer_location = pointer.current_location();
++                    self.niri.layout.activate_window(&window);
++                    self.niri.layer_shell_on_demand_focus = None;
++                    // Keep this invariant explicit even if layout activation
++                    // grows pointer-related behavior upstream. set_location()
++                    // preserves the coordinates without synthesizing a motion
++                    // event through the newly focused application.
++                    pointer.set_location(pointer_location);
++                    self.niri.queue_redraw_all();
+                 }
+             }
+             Action::FocusWindowInColumn(index) => {
+@@ -1744,11 +1758,17 @@ impl State {
+             }
+             Action::FocusMonitor(output) => {
+                 if let Some(output) = self.niri.output_by_name_match(&output).cloned() {
++                    // FocusMonitor(output) is the IPC-only exact-output action
++                    // used by shell surfaces that live on a configured output.
++                    // Unlike directional monitor navigation, it must not move
++                    // the pointer away from the output where it was invoked.
++                    let pointer = self.niri.seat.get_pointer().unwrap();
++                    let pointer_location = pointer.current_location();
+                     self.niri.layout.focus_output(&output);
+-                    if !self.maybe_warp_cursor_to_focus_centered() {
+-                        self.move_cursor_to_output(&output);
+-                    }
+                     self.niri.layer_shell_on_demand_focus = None;
++                    // Keep the no-warp contract explicit even if focus_output()
++                    // gains pointer-related behavior in the future.
++                    pointer.set_location(pointer_location);
+                 }
+             }
+             Action::MoveWindowToMonitorLeft => {

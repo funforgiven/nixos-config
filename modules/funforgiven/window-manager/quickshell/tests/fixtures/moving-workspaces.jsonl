@@ -1,0 +1,8 @@
+{"WorkspacesChanged":{"workspaces":[{"id":1,"idx":1,"name":"code","output":"DP-1","is_urgent":false,"is_active":true,"is_focused":true,"active_window_id":10},{"id":2,"idx":1,"name":"web","output":"HDMI-A-2","is_urgent":false,"is_active":true,"is_focused":false,"active_window_id":20},{"id":3,"idx":2,"name":"chat","output":"DP-1","is_urgent":false,"is_active":false,"is_focused":false,"active_window_id":null}]}}
+{"WorkspacesChanged":{"workspaces":[{"id":3,"idx":2,"name":"chat","output":"HDMI-A-2","is_urgent":false,"is_active":false,"is_focused":false,"active_window_id":null},{"id":1,"idx":1,"name":"code","output":"DP-1","is_urgent":false,"is_active":true,"is_focused":true,"active_window_id":10},{"id":2,"idx":1,"name":"web","output":"HDMI-A-2","is_urgent":false,"is_active":true,"is_focused":false,"active_window_id":20}]}}
+{"WorkspaceActivated":{"id":3,"focused":true}}
+{"WorkspaceActiveWindowChanged":{"workspace_id":3,"active_window_id":909}}
+{"WorkspaceUrgencyChanged":{"id":3,"urgent":true}}
+{"WorkspaceActivated":{"id":999,"focused":true}}
+{"WorkspaceActiveWindowChanged":{"workspace_id":999,"active_window_id":null}}
+{"WorkspaceUrgencyChanged":{"id":999,"urgent":true}}

@@ -1,0 +1,474 @@
+diff --git a/src/io/datastream.cpp b/src/io/datastream.cpp
+index 804c412..85a6aac 100644
+--- a/src/io/datastream.cpp
++++ b/src/io/datastream.cpp
+@@ -96,6 +96,8 @@ void SplitParser::parseBytes(QByteArray& incoming, QByteArray& buffer) {
+ 		buffer.clear();
+ 		buffer.insert(0, slice);
+ 	}
++
++	this->enforceBufferLimit(buffer);
+ }
+ 
+ void SplitParser::streamEnded(QByteArray& buffer) {
+@@ -112,6 +114,24 @@ void SplitParser::setSplitMarker(QString marker) {
+ 	emit this->splitMarkerChanged();
+ }
+ 
++qint64 SplitParser::maximumBufferSize() const { return this->mMaximumBufferSize; }
++
++void SplitParser::setMaximumBufferSize(qint64 size) {
++	if (size < -1) size = -1;
++	if (size == this->mMaximumBufferSize) return;
++
++	this->mMaximumBufferSize = size;
++	emit this->maximumBufferSizeChanged();
++}
++
++void SplitParser::enforceBufferLimit(QByteArray& buffer) {
++	if (this->mMaximumBufferSize < 0 || buffer.size() <= this->mMaximumBufferSize) return;
++
++	const auto size = static_cast<qint64>(buffer.size());
++	buffer.clear();
++	emit this->bufferLimitExceeded(size);
++}
++
+ void StdioCollector::parseBytes(QByteArray& incoming, QByteArray& buffer) {
+ 	buffer.append(incoming);
+ 
+diff --git a/src/io/datastream.hpp b/src/io/datastream.hpp
+index b91ec04..164be98 100644
+--- a/src/io/datastream.hpp
++++ b/src/io/datastream.hpp
+@@ -71,6 +71,12 @@ class SplitParser: public DataStreamParser {
+ 	/// If the delimiter is empty read lengths may be arbitrary (whatever is returned by the
+ 	/// underlying read call.)
+ 	Q_PROPERTY(QString splitMarker READ splitMarker WRITE setSplitMarker NOTIFY splitMarkerChanged);
++	/// Maximum number of unterminated bytes retained between reads. `-1` keeps
++	/// the historical unlimited behavior. Defaults to `-1`.
++	Q_PROPERTY(
++	    qint64 maximumBufferSize READ maximumBufferSize WRITE setMaximumBufferSize NOTIFY
++	        maximumBufferSizeChanged
++	);
+ 	QML_ELEMENT;
+ 
+ public:
+@@ -81,13 +87,21 @@ public:
+ 
+ 	[[nodiscard]] QString splitMarker() const;
+ 	void setSplitMarker(QString marker);
++	[[nodiscard]] qint64 maximumBufferSize() const;
++	void setMaximumBufferSize(qint64 size);
+ 
+ signals:
+ 	void splitMarkerChanged();
++	void maximumBufferSizeChanged();
++	/// Emitted after an unterminated buffer exceeds @@maximumBufferSize and is discarded.
++	void bufferLimitExceeded(qint64 size);
+ 
+ private:
++	void enforceBufferLimit(QByteArray& buffer);
++
+ 	QString mSplitMarker = "\n";
+ 	bool mSplitMarkerChanged = false;
++	qint64 mMaximumBufferSize = -1;
+ };
+ 
+ ///! DataStreamParser that collects all output into a buffer
+diff --git a/src/io/socket.cpp b/src/io/socket.cpp
+index 371f687..d2dfd4a 100644
+--- a/src/io/socket.cpp
++++ b/src/io/socket.cpp
+@@ -77,8 +77,23 @@ void Socket::setConnected(bool connected) {
+ 
+ 	if (!connected) {
+ 		if (this->socket != nullptr && !this->disconnecting) {
+-			this->disconnecting = true;
+-			this->socket->disconnectFromServer();
++			if (!this->connected || this->socket->state() == QLocalSocket::UnconnectedState) {
++				// A failed or canceled initial connection may never emit
++				// disconnected. Drop that socket so a later true target can create
++				// a fresh connection attempt.
++				auto* oldSocket = this->socket;
++				QObject::disconnect(oldSocket, nullptr, this, nullptr);
++				this->socket = nullptr;
++				this->disconnecting = false;
++				oldSocket->deleteLater();
++				if (this->connected) {
++					this->connected = false;
++					emit this->connectionStateChanged();
++				}
++			} else {
++				this->disconnecting = true;
++				this->socket->disconnectFromServer();
++			}
+ 		}
+ 	} else if (this->socket == nullptr) this->connectPathSocket();
+ }
+diff --git a/src/io/test/CMakeLists.txt b/src/io/test/CMakeLists.txt
+index 8b3da6a..662861c 100644
+--- a/src/io/test/CMakeLists.txt
++++ b/src/io/test/CMakeLists.txt
+@@ -6,3 +6,4 @@ endfunction()
+ 
+ qs_test(datastream datastream.cpp ../datastream.cpp)
+ qs_test(process process.cpp ../process.cpp ../datastream.cpp ../processcore.cpp)
++qs_test(socketreconnect socketreconnect.cpp)
+diff --git a/src/io/test/socketreconnect.cpp b/src/io/test/socketreconnect.cpp
+new file mode 100644
+index 0000000..731c1bc
+--- /dev/null
++++ b/src/io/test/socketreconnect.cpp
+@@ -0,0 +1,35 @@
++#include <qobject.h>
++#include <qtemporarydir.h>
++#include <qtest.h>
++#include <qtestcase.h>
++
++#include "../socket.hpp"
++
++class TestSocketReconnect: public QObject {
++	Q_OBJECT;
++
++private slots:
++	void reconnectsAfterInitialFailure();
++};
++
++void TestSocketReconnect::reconnectsAfterInitialFailure() {
++	QTemporaryDir directory;
++	QVERIFY(directory.isValid());
++
++	Socket socket;
++	auto errorCount = 0;
++	QObject::connect(&socket, &Socket::error, &socket, [&] {
++		errorCount += 1;
++		socket.setConnected(false);
++	});
++	socket.setPath(directory.filePath("missing.sock"));
++	socket.setConnected(true);
++	QTRY_COMPARE_WITH_TIMEOUT(errorCount, 1, 1000);
++
++	socket.setConnected(true);
++	QTRY_COMPARE_WITH_TIMEOUT(errorCount, 2, 1000);
++}
++
++QTEST_MAIN(TestSocketReconnect);
++
++#include "socketreconnect.moc"
+diff --git a/src/io/test/datastream.cpp b/src/io/test/datastream.cpp
+index c83d8ad..fee6333 100644
+--- a/src/io/test/datastream.cpp
++++ b/src/io/test/datastream.cpp
+@@ -103,4 +103,29 @@ void TestSplitParser::initBuffer() { // NOLINT
+ 	QCOMPARE(buf, "baz");
+ }
+ 
++void TestSplitParser::bufferLimit() { // NOLINT
++	auto parser = SplitParser();
++	auto readSpy = QSignalSpy(&parser, &DataStreamParser::read);
++	auto limitSpy = QSignalSpy(&parser, &SplitParser::bufferLimitExceeded);
++	auto buffer = QByteArray();
++
++	parser.setMaximumBufferSize(4);
++	auto boundary = QByteArray("1234");
++	parser.parseBytes(boundary, buffer);
++	QCOMPARE(buffer, "1234");
++	QCOMPARE(limitSpy.count(), 0);
++
++	auto overflow = QByteArray("5");
++	parser.parseBytes(overflow, buffer);
++	QCOMPARE(buffer, "");
++	QCOMPARE(limitSpy.count(), 1);
++	QCOMPARE(limitSpy.takeFirst().at(0).toLongLong(), 5);
++
++	auto recovered = QByteArray("ok\n");
++	parser.parseBytes(recovered, buffer);
++	QCOMPARE(readSpy.count(), 1);
++	QCOMPARE(readSpy.takeFirst().at(0).toString(), "ok");
++	QCOMPARE(buffer, "");
++}
++
+ QTEST_MAIN(TestSplitParser);
+diff --git a/src/io/test/datastream.hpp b/src/io/test/datastream.hpp
+index cd89bb8..8fb6606 100644
+--- a/src/io/test/datastream.hpp
++++ b/src/io/test/datastream.hpp
+@@ -10,4 +10,5 @@ private slots:
+ 	void splits_data(); // NOLINT
+ 	void splits();
+ 	void initBuffer();
++	void bufferLimit();
+ };
+diff --git a/src/core/popupanchor.cpp b/src/core/popupanchor.cpp
+index 2d15a1a..93c81cc 100644
+--- a/src/core/popupanchor.cpp
++++ b/src/core/popupanchor.cpp
+@@ -111,0 +112,5 @@ void PopupAnchor::onItemWindowChanged() {
++	if (!this->mItem) {
++		this->setWindowInternal(nullptr);
++		return;
++	}
++
+diff --git a/src/window/test/popupwindow.cpp b/src/window/test/popupwindow.cpp
+index 10dfd22..c879b27 100644
+--- a/src/window/test/popupwindow.cpp
++++ b/src/window/test/popupwindow.cpp
+@@ -2,0 +3 @@
++#include <qquickitem.h>
+@@ -180,0 +182,12 @@ void TestPopupWindow::xMigrationFix() { // NOLINT
++void TestPopupWindow::clearAnchorItem() { // NOLINT
++	auto item = QQuickItem();
++	auto anchor = PopupAnchor(nullptr);
++
++	anchor.setItem(&item);
++	QCOMPARE(anchor.item(), &item);
++
++	anchor.setItem(nullptr);
++	QCOMPARE(anchor.item(), nullptr);
++	QCOMPARE(anchor.backingWindow(), nullptr);
++}
++
+diff --git a/src/window/test/popupwindow.hpp b/src/window/test/popupwindow.hpp
+index b687fa8..2bf05e5 100644
+--- a/src/window/test/popupwindow.hpp
++++ b/src/window/test/popupwindow.hpp
+@@ -17,0 +18 @@ private slots:
++	void clearAnchorItem();
+diff --git a/src/services/pipewire/device.cpp b/src/services/pipewire/device.cpp
+index 61079a1..af4d58e 100644
+--- a/src/services/pipewire/device.cpp
++++ b/src/services/pipewire/device.cpp
+@@ -4,0 +5 @@
++#include <limits>
+@@ -17,0 +19 @@
++#include <spa/pod/iter.h>
+@@ -38,0 +41 @@ void PwDevice::bindHooks() {
++	QObject::connect(this->registry->core, &PwCore::synced, this, &PwDevice::onCoreSync);
+@@ -42,0 +46 @@ void PwDevice::unbindHooks() {
++	QObject::disconnect(this->registry->core, &PwCore::synced, this, &PwDevice::onCoreSync);
+@@ -45,0 +50,7 @@ void PwDevice::unbindHooks() {
++	this->activeRoutes.clear();
++	this->enumeratedRoutes.clear();
++	this->stagingActiveRoutes.clear();
++	this->stagingEnumeratedRoutes.clear();
++	this->availabilityEnumSequence = 0;
++	this->availabilitySyncSequence = 0;
++	this->routeWritable = false;
+@@ -46,0 +58 @@ void PwDevice::unbindHooks() {
++	emit this->routeAvailabilityChanged();
+@@ -58,0 +71,9 @@ void PwDevice::onInfo(void* data, const pw_device_info* info) {
++		self->stagingActiveRoutes.clear();
++		self->stagingEnumeratedRoutes.clear();
++		self->availabilitySyncSequence = 0;
++		self->routeWritable = false;
++		self->lastEnumSequence = self->lastEnumSequence == std::numeric_limits<qint32>::max()
++		                           ? 1
++		                           : self->lastEnumSequence + 1;
++		self->availabilityEnumSequence = self->lastEnumSequence;
++
+@@ -63 +84,3 @@ void PwDevice::onInfo(void* data, const pw_device_info* info) {
+-				if ((param.flags & SPA_PARAM_INFO_READWRITE) == SPA_PARAM_INFO_READWRITE) {
++				self->routeWritable = (param.flags & SPA_PARAM_INFO_READWRITE) == SPA_PARAM_INFO_READWRITE;
++
++				if ((param.flags & SPA_PARAM_INFO_READ) == SPA_PARAM_INFO_READ) {
+@@ -67 +90,8 @@ void PwDevice::onInfo(void* data, const pw_device_info* info) {
+-					pw_device_enum_params(self->proxy(), 0, param.id, 0, UINT32_MAX, nullptr);
++					pw_device_enum_params(
++					    self->proxy(),
++					    self->availabilityEnumSequence,
++					    param.id,
++					    0,
++					    UINT32_MAX,
++					    nullptr
++					);
+@@ -70 +100 @@ void PwDevice::onInfo(void* data, const pw_device_info* info) {
+-					                     << "as the param does not have read+write permissions.";
++					                     << "as the param is not readable.";
+@@ -72,2 +102,12 @@ void PwDevice::onInfo(void* data, const pw_device_info* info) {
+-
+-				break;
++			} else if (param.id == SPA_PARAM_EnumRoute
++			           && (param.flags & SPA_PARAM_INFO_READ) == SPA_PARAM_INFO_READ)
++			{
++				qCDebug(logDevice) << "Enumerating available routes param for" << self;
++				pw_device_enum_params(
++				    self->proxy(),
++				    self->availabilityEnumSequence,
++				    param.id,
++				    0,
++				    UINT32_MAX,
++				    nullptr
++				);
+@@ -75,0 +116,2 @@ void PwDevice::onInfo(void* data, const pw_device_info* info) {
++
++		self->availabilitySyncSequence = self->registry->core->sync(self->id);
+@@ -81 +123 @@ void PwDevice::onParam(
+-    qint32 /*seq*/,
++    qint32 seq,
+@@ -99 +141,41 @@ void PwDevice::onParam(
+-		self->addDeviceIndexPairs(param);
++		if (self->routeWritable) self->addDeviceIndexPairs(param);
++		if (self->availabilitySyncSequence != 0 && seq == self->availabilityEnumSequence) {
++			self->addRouteAvailability(param, false);
++		}
++	} else if (self->availabilitySyncSequence != 0 && id == SPA_PARAM_EnumRoute
++	           && seq == self->availabilityEnumSequence)
++	{
++		self->addRouteAvailability(param, true);
++	}
++}
++
++void PwDevice::addRouteAvailability(const spa_pod* param, bool enumerated) {
++	auto route = RouteAvailability {};
++	route.availability = SPA_PARAM_AVAILABILITY_unknown;
++	const auto* availabilityProp = spa_pod_find_prop(param, nullptr, SPA_PARAM_ROUTE_available);
++
++	if (availabilityProp != nullptr) {
++		spa_pod_get_id(&availabilityProp->value, &route.availability);
++	}
++
++	if (enumerated) {
++		const auto* devicesProp = spa_pod_find_prop(param, nullptr, SPA_PARAM_ROUTE_devices);
++		if (devicesProp == nullptr || !spa_pod_is_array(&devicesProp->value)) return;
++
++		const auto* devices = reinterpret_cast<const spa_pod_array*>(&devicesProp->value);
++		if (SPA_POD_ARRAY_VALUE_TYPE(devices) != SPA_TYPE_Int
++		    || SPA_POD_ARRAY_VALUE_SIZE(devices) != sizeof(qint32))
++		{
++			return;
++		}
++
++		const qint32* device = nullptr;
++		SPA_POD_ARRAY_FOREACH(devices, device) { route.devices.append(*device); }
++		this->stagingEnumeratedRoutes.append(route);
++	} else {
++		const auto* deviceProp = spa_pod_find_prop(param, nullptr, SPA_PARAM_ROUTE_device);
++		qint32 device = 0;
++		if (deviceProp == nullptr || spa_pod_get_int(&deviceProp->value, &device) < 0) return;
++
++		route.devices.append(device);
++		this->stagingActiveRoutes.append(route);
+@@ -147,0 +230,18 @@ bool PwDevice::hasRouteDevice(qint32 routeDevice) const {
++bool PwDevice::hasAvailableRoutes(qint32 routeDevice) const {
++	for (const auto& route: this->activeRoutes) {
++		if (route.devices.contains(routeDevice)) {
++			return route.availability != SPA_PARAM_AVAILABILITY_no;
++		}
++	}
++
++	auto found = false;
++	for (const auto& route: this->enumeratedRoutes) {
++		if (route.devices.contains(routeDevice)) {
++			found = true;
++			if (route.availability != SPA_PARAM_AVAILABILITY_no) return true;
++		}
++	}
++
++	return !found;
++}
++
+@@ -163,0 +264,10 @@ void PwDevice::polled() {
++void PwDevice::onCoreSync(quint32 id, qint32 seq) {
++	if (id != this->id || seq != this->availabilitySyncSequence) return;
++
++	this->activeRoutes = std::move(this->stagingActiveRoutes);
++	this->enumeratedRoutes = std::move(this->stagingEnumeratedRoutes);
++	this->availabilityEnumSequence = 0;
++	this->availabilitySyncSequence = 0;
++	emit this->routeAvailabilityChanged();
++}
++
+diff --git a/src/services/pipewire/device.hpp b/src/services/pipewire/device.hpp
+index cd61709..e112085 100644
+--- a/src/services/pipewire/device.hpp
++++ b/src/services/pipewire/device.hpp
+@@ -38,0 +39 @@ public:
++	[[nodiscard]] bool hasAvailableRoutes(qint32 routeDevice) const;
+@@ -42,0 +44 @@ signals:
++	void routeAvailabilityChanged();
+@@ -45,0 +48 @@ private slots:
++	void onCoreSync(quint32 id, qint32 seq);
+@@ -57,0 +61,15 @@ private:
++	struct RouteAvailability {
++		QList<qint32> devices;
++		quint32 availability;
++	};
++
++	QList<RouteAvailability> activeRoutes;
++	QList<RouteAvailability> enumeratedRoutes;
++	QList<RouteAvailability> stagingActiveRoutes;
++	QList<RouteAvailability> stagingEnumeratedRoutes;
++	qint32 availabilityEnumSequence = 0;
++	qint32 availabilitySyncSequence = 0;
++	qint32 lastEnumSequence = 0;
++	bool routeWritable = false;
++	void addRouteAvailability(const spa_pod* param, bool enumerated);
++
+diff --git a/src/services/pipewire/node.cpp b/src/services/pipewire/node.cpp
+index 73e4da5..32e4ffa 100644
+--- a/src/services/pipewire/node.cpp
++++ b/src/services/pipewire/node.cpp
+@@ -121,0 +122 @@ void PwNode::unbindHooks() {
++	emit this->routeAvailabilityChanged();
+@@ -196,0 +198,7 @@ void PwNode::initProps(const spa_dict* props) {
++			} else {
++				QObject::connect(
++				    this->device,
++				    &PwDevice::routeAvailabilityChanged,
++				    this,
++				    &PwNode::routeAvailabilityChanged
++				);
+@@ -228,0 +237 @@ void PwNode::onInfo(void* data, const pw_node_info* info) {
++			auto newRouteDevice = -1;
+@@ -237,0 +247,2 @@ void PwNode::onInfo(void* data, const pw_node_info* info) {
++				} else {
++					newRouteDevice = id;
+@@ -240,2 +250,0 @@ void PwNode::onInfo(void* data, const pw_node_info* info) {
+-				self->routeDevice = id;
+-				if (self->boundData) self->boundData->onDeviceChanged();
+@@ -248,0 +258,7 @@ void PwNode::onInfo(void* data, const pw_node_info* info) {
++
++			if (newRouteDevice != self->routeDevice) {
++				self->routeDevice = newRouteDevice;
++				emit self->routeAvailabilityChanged();
++			}
++
++			if (newRouteDevice != -1 && self->boundData) self->boundData->onDeviceChanged();
+@@ -268,0 +285,5 @@ void PwNode::onInfo(void* data, const pw_node_info* info) {
++bool PwNode::routeAvailable() const {
++	return this->device == nullptr || this->routeDevice == -1
++	    || this->device->hasAvailableRoutes(this->routeDevice);
++}
++
+diff --git a/src/services/pipewire/node.hpp b/src/services/pipewire/node.hpp
+index 58aa65a..25fd326 100644
+--- a/src/services/pipewire/node.hpp
++++ b/src/services/pipewire/node.hpp
+@@ -256,0 +257 @@ public:
++	[[nodiscard]] bool routeAvailable() const;
+@@ -260,0 +262 @@ signals:
++	void routeAvailabilityChanged();
+diff --git a/src/services/pipewire/qml.cpp b/src/services/pipewire/qml.cpp
+index e4424c1..b6cbb44 100644
+--- a/src/services/pipewire/qml.cpp
++++ b/src/services/pipewire/qml.cpp
+@@ -319,0 +320,6 @@ PwNodeIface::PwNodeIface(PwNode* node): PwObjectIface(node), mNode(node) {
++	QObject::connect(
++	    node,
++	    &PwNode::routeAvailabilityChanged,
++	    this,
++	    &PwNodeIface::routeAvailabilityChanged
++	);
+@@ -341,0 +348,2 @@ bool PwNodeIface::isReady() const { return this->mNode->ready; }
++bool PwNodeIface::routeAvailable() const { return this->mNode->routeAvailable(); }
++
+diff --git a/src/services/pipewire/qml.hpp b/src/services/pipewire/qml.hpp
+index 458ddeb..8fb9c49 100644
+--- a/src/services/pipewire/qml.hpp
++++ b/src/services/pipewire/qml.hpp
+@@ -317,0 +318 @@ class PwNodeIface: public PwObjectIface {
++	Q_PROPERTY(bool routeAvailable READ routeAvailable NOTIFY routeAvailabilityChanged);
+@@ -331,0 +333 @@ public:
++	[[nodiscard]] bool routeAvailable() const;
+@@ -340,0 +343 @@ signals:
++	void routeAvailabilityChanged();

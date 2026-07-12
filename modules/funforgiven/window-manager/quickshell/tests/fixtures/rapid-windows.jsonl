@@ -1,0 +1,17 @@
+{"WindowsChanged":{"windows":[]}}
+{"WindowFocusTimestampChanged":{"id":501,"focus_timestamp":{"secs":1,"nanos":1}}}
+{"WindowLayoutsChanged":{"changes":[[501,{"pos_in_scrolling_layout":[1,1],"tile_size":[800.0,600.0],"window_size":[780,560],"tile_pos_in_workspace_view":[0.0,0.0],"window_offset_in_tile":[10.0,20.0]}]]}}
+{"WindowClosed":{"id":501}}
+{"WindowOpenedOrChanged":{"window":{"id":501,"title":"Loading","app_id":"example","pid":5010,"workspace_id":null,"is_focused":false,"is_floating":false,"is_urgent":false,"layout":{"pos_in_scrolling_layout":[2,1],"tile_size":[800.0,600.0],"window_size":[780,560],"tile_pos_in_workspace_view":[800.0,0.0],"window_offset_in_tile":[10.0,20.0]},"focus_timestamp":null}}}
+{"WindowOpenedOrChanged":{"window":{"id":501,"title":"Ready","app_id":"example","pid":5010,"workspace_id":44,"is_focused":true,"is_floating":false,"is_urgent":false,"layout":{"pos_in_scrolling_layout":[2,1],"tile_size":[800.0,600.0],"window_size":[780,560],"tile_pos_in_workspace_view":[800.0,0.0],"window_offset_in_tile":[10.0,20.0]},"focus_timestamp":null}}}
+{"WindowOpenedOrChanged":{"window":{"id":502,"title":"Transient","app_id":"example-dialog","pid":5020,"workspace_id":44,"is_focused":true,"is_floating":true,"is_urgent":false,"layout":{"pos_in_scrolling_layout":null,"tile_size":[500.0,300.0],"window_size":[480,260],"tile_pos_in_workspace_view":null,"window_offset_in_tile":[10.0,20.0]},"focus_timestamp":null}}}
+{"WindowFocusChanged":{"id":501}}
+{"WindowFocusTimestampChanged":{"id":501,"focus_timestamp":{"secs":200,"nanos":300}}}
+{"WindowUrgencyChanged":{"id":501,"urgent":true}}
+{"WindowLayoutsChanged":{"changes":[[501,{"pos_in_scrolling_layout":[1,2],"tile_size":[960.0,540.0],"window_size":[940,500],"tile_pos_in_workspace_view":[0.0,540.0],"window_offset_in_tile":[10.0,20.0]}],[999,{"pos_in_scrolling_layout":[1,1],"tile_size":[1.0,1.0],"window_size":[1,1],"tile_pos_in_workspace_view":[0.0,0.0],"window_offset_in_tile":[0.0,0.0]}]]}}
+{"WindowClosed":{"id":502}}
+{"WindowOpenedOrChanged":{"window":{"id":503,"title":"Short lived","app_id":"short","pid":5030,"workspace_id":44,"is_focused":false,"is_floating":false,"is_urgent":false,"layout":{"pos_in_scrolling_layout":[2,1],"tile_size":[960.0,1080.0],"window_size":[940,1040],"tile_pos_in_workspace_view":[960.0,0.0],"window_offset_in_tile":[10.0,20.0]},"focus_timestamp":null}}}
+{"WindowClosed":{"id":503}}
+{"WindowClosed":{"id":999}}
+{"WindowFocusChanged":{"id":null}}
+{"WindowFocusChanged":{"id":501}}
