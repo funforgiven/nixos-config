@@ -8,6 +8,7 @@ let
     "firmware"
     "parmigiano-hardware"
     "amd-desktop"
+    "amd-x3d"
     "gpu"
     "nvidia"
     "funforgiven-locale"
