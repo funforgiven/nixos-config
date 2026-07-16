@@ -98,6 +98,10 @@
               trust_level = "trusted";
             };
 
+            projects."${config.home.homeDirectory}/dev/anwa" = {
+              trust_level = "trusted";
+            };
+
             projects."${config.home.homeDirectory}/dev/infra" = {
               trust_level = "trusted";
             };
