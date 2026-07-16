@@ -20,10 +20,6 @@ _: {
           name = "steam";
           open-on-output = outputs.primary.identifier;
         };
-        "04-passwords" = {
-          name = "passwords";
-          open-on-output = outputs.secondary.identifier;
-        };
       };
     };
 }

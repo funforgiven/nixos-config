@@ -56,6 +56,9 @@
         in
         builtins.isAttrs action && builtins.hasAttr "switch-layout" action
       ) (builtins.attrValues home.programs.niri.settings.binds);
+      onePasswordWindowRule = lib.findFirst (
+        rule: lib.any (match: (match.app-id or null) == "(?i)^(1password|onepassword)$") rule.matches
+      ) (throw "The 1Password Niri window rule is missing") home.programs.niri.settings.window-rules;
       contract = pkgs.writeText "funforgiven-desktop-runtime-contract.json" (
         builtins.toJSON {
           greetd = host.services.greetd.enable;
@@ -206,6 +209,10 @@
           workspaceOutputs = lib.mapAttrs (
             _: workspace: workspace.open-on-output
           ) home.programs.niri.settings.workspaces;
+          onePasswordWindowRule = {
+            openOnOutput = onePasswordWindowRule.open-on-output;
+            openOnWorkspace = onePasswordWindowRule.open-on-workspace;
+          };
           niriSpawn = home.programs.niri.settings.spawn-at-startup;
           niriDirectConfig = home.xdg.configFile.niri-config.enable;
           niriHasDms = lib.hasInfix "dms" lowerNiriConfig || lib.hasInfix "dank" lowerNiriConfig;
@@ -402,7 +409,9 @@
               and .workspaceOutputs."01-discord" == .secondaryOutput.identifier
               and .workspaceOutputs."02-telegram" == .portraitOutput.identifier
               and .workspaceOutputs."03-steam" == .primaryOutput.identifier
-              and .workspaceOutputs."04-passwords" == .secondaryOutput.identifier
+              and ((.workspaceOutputs | keys) == ["01-discord", "02-telegram", "03-steam"])
+              and .onePasswordWindowRule.openOnOutput == .primaryOutput.identifier
+              and .onePasswordWindowRule.openOnWorkspace == null
               and .niriSpawn == []
               and .niriDirectConfig == true
               and .niriHasDms == false
