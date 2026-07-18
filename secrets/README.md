@@ -8,6 +8,7 @@ Commit secret values only as SOPS ciphertext. Recipients are declared in
 | SOPS file and key | Purpose |
 | --- | --- |
 | `github-ssh-key.sops` | GitHub SSH authentication and signing |
+| `api-tokens.yaml` → `codex/anwa_github_mcp_token` | Anwa workspace GitHub MCP server |
 | `api-tokens.yaml` → `codex/github_mcp_token` | GitHub MCP server |
 | `api-tokens.yaml` → `codex/context7_api_key` | Context7 MCP server |
 | `password-hashes.yaml` → `users/funforgiven/password_hash` | NixOS account password hash |

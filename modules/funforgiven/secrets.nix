@@ -6,6 +6,7 @@
 }:
 let
   user = config.users.funforgiven;
+  anwaWorkspace = "${user.homeDirectory}/dev/anwa";
   hostIdentityPath = "/etc/ssh/ssh_host_ed25519_key";
   # Verification-only: existing commits were signed by this public key before
   # the SOPS migration. Keeping it does not invoke or depend on 1Password.
@@ -15,6 +16,7 @@ let
   passwordHashesFile = ../../secrets/password-hashes.yaml;
   passwordHashSecretName = "${user.username}-password-hash";
   apiTokenKeys = {
+    anwa-github-mcp-token = "codex/anwa_github_mcp_token";
     context7-api-key = "codex/context7_api_key";
     github-mcp-token = "codex/github_mcp_token";
   };
@@ -84,6 +86,28 @@ let
         secretPath = secretPaths.github-mcp-token;
         variable = "GITHUB_PERSONAL_ACCESS_TOKEN";
       };
+      anwaGithubMcpLauncher = mkSecretMcpLauncher {
+        name = "github-mcp-server-anwa";
+        package = pkgs.github-mcp-server;
+        inherit pkgs;
+        secretPath = secretPaths.anwa-github-mcp-token;
+        variable = "GITHUB_PERSONAL_ACCESS_TOKEN";
+      };
+      scopedGithubMcpLauncher = pkgs.writeShellApplication {
+        name = "github-mcp-server-scoped";
+        text = ''
+          anwa_workspace="$(${lib.getExe' pkgs.coreutils "realpath"} --canonicalize-missing ${lib.escapeShellArg anwaWorkspace})"
+          readonly anwa_workspace
+          session_directory="$(${lib.getExe' pkgs.coreutils "realpath"} --canonicalize-existing .)"
+          readonly session_directory
+
+          if [[ "$session_directory" == "$anwa_workspace" || "$session_directory" == "$anwa_workspace/"* ]]; then
+            exec ${lib.getExe anwaGithubMcpLauncher} "$@"
+          fi
+
+          exec ${lib.getExe githubMcpLauncher} --read-only "$@"
+        '';
+      };
     in
     {
       home.file = {
@@ -116,16 +140,15 @@ let
               default_tools_approval_mode = "auto";
             };
             github = {
-              command = lib.getExe githubMcpLauncher;
+              command = lib.getExe scopedGithubMcpLauncher;
               args = [
-                "--read-only"
                 "--toolsets"
                 "repos,issues,pull_requests,users"
                 "stdio"
               ];
               startup_timeout_sec = 20;
               tool_timeout_sec = 120;
-              default_tools_approval_mode = "auto";
+              default_tools_approval_mode = "writes";
             };
           };
         };
