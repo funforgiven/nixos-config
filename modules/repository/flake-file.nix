@@ -22,6 +22,11 @@ in
 
       nixpkgs-codex.url = "github:NixOS/nixpkgs/master";
 
+      sops-nix = {
+        url = "github:Mic92/sops-nix";
+        inputs.nixpkgs.follows = "nixpkgs";
+      };
+
       flake-file.url = "github:denful/flake-file";
 
       files = {

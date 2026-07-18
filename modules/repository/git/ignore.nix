@@ -17,7 +17,6 @@ in
       "/hardware-configuration.nix"
       "/result"
       "/result-*"
-      "/secrets/*.age"
       "/secrets/*.hash"
       "/secrets/*.key"
       "/secrets/*.pem"

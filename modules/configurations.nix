@@ -392,8 +392,15 @@ in
                 description = "Home Manager profiles for this user.";
               };
 
-              accounts.github.username = lib.mkOption {
-                type = lib.types.singleLineStr;
+              accounts.github = {
+                username = lib.mkOption {
+                  type = lib.types.singleLineStr;
+                };
+
+                sshPublicKey = lib.mkOption {
+                  type = lib.types.addCheck lib.types.singleLineStr (value: lib.hasPrefix "ssh-ed25519 " value);
+                  description = "Public SSH key used for GitHub authentication and signing.";
+                };
               };
             };
           }

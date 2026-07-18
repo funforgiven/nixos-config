@@ -17,7 +17,8 @@ or a declarative PipeWire setup.
 - Turkish and Japanese input through Fcitx5 and Mozc
 - Btrfs on NVMe through disko, with systemd-boot
 - Wallpaper-derived colors shared through Matugen and Stylix
-- 1Password for credentials that are needed at runtime
+- SOPS/age for the account password hash and machine credentials, with
+  1Password retained for desktop and browser password management
 
 ## Repository Layout
 
@@ -41,7 +42,7 @@ distant paths directly.
 
 ## Local Files
 
-Two machine-local inputs are deliberately kept out of Git:
+The configuration relies on these files and identities outside Git:
 
 - The wallpaper is expected at `/home/funforgiven/Pictures/Wallpapers/current.png`. Refresh its locked
   content after replacing it with:
@@ -50,12 +51,16 @@ Two machine-local inputs are deliberately kept out of Git:
   nix flake update wallpaper --accept-flake-config
   ```
 
-- The account password hash is expected at
-  `/var/lib/nixos-secrets/funforgiven-password.hash` with owner
-  `root` and mode `0600`.
+- The complete personal age identity at
+  `/home/funforgiven/.config/sops/age/keys.txt` is the recovery key
+  for every SOPS secret and must be backed up securely.
 
-Runtime API credentials are read from 1Password. The repository contains
-references to those items, not their values.
+- NixOS uses `/etc/ssh/ssh_host_ed25519_key` for unattended decryption.
+  Backing it up is optional, but a replacement host key must be added as
+  a recipient before installation.
+
+See [`secrets/README.md`](secrets/README.md) for editing, recovery, and
+rotation.
 
 ## Generated Files
 
@@ -112,13 +117,8 @@ The disko command below destroys the configured target disk. Read
      --mode destroy,format,mount --flake .#parmigiano
    ```
 
-3. Create the password hash expected by the user module:
-
-   ```sh
-   sudo mkdir -p /mnt/var/lib/nixos-secrets
-   mkpasswd -m yescrypt | sudo tee /mnt/var/lib/nixos-secrets/funforgiven-password.hash >/dev/null
-   sudo chmod 600 /mnt/var/lib/nixos-secrets/funforgiven-password.hash
-   ```
+3. Restore the existing SSH host private key, or add a new host recipient
+   as described in [`secrets/README.md`](secrets/README.md).
 
 4. Install NixOS:
 

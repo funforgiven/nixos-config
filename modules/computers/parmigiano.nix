@@ -16,6 +16,7 @@ let
     "networking"
     "nix"
     "funforgiven-account"
+    "funforgiven-secrets"
     "sudo"
     "fish"
     "udisks"

@@ -18,43 +18,6 @@
         mcpNixos = inputs.mcp-nixos.packages.${system}.mcp-nixos;
         terraformMcpServer = pkgs.terraform-mcp-server;
         uvx = lib.getExe' pkgs.uv "uvx";
-        onePassword = "/run/wrappers/bin/op";
-        mkOnePasswordMcpServer =
-          {
-            name,
-            package,
-            secrets,
-          }:
-          pkgs.writeShellApplication {
-            inherit name;
-            text = ''
-              if [ ! -x ${onePassword} ]; then
-                echo "Expected /run/wrappers/bin/op from programs._1password.enable." >&2
-                exit 1
-              fi
-
-              export OP_BIOMETRIC_UNLOCK_ENABLED=true
-
-              ${lib.concatStringsSep "\n" (
-                lib.mapAttrsToList (variable: reference: ''
-                  ${variable}="$(${onePassword} read ${lib.escapeShellArg reference})"
-                  export ${variable}
-                '') secrets
-              )}
-
-              exec ${lib.getExe package} "$@"
-            '';
-          };
-        context7McpServer = mkOnePasswordMcpServer {
-          name = "context7-mcp";
-          package = pkgs.context7-mcp;
-          secrets.CONTEXT7_API_KEY = "op://Private/nixos-config/context7_api_key";
-        };
-        githubMcpServer = mkOnePasswordMcpServer {
-          name = "github-mcp-server";
-          package = pkgs.github-mcp-server;
-          secrets.GITHUB_PERSONAL_ACCESS_TOKEN = "op://Private/nixos-config/github_token";
-        };
         uvEnvironment = {
           UV_NO_MANAGED_PYTHON = "true";
           UV_PYTHON = "${python}/bin/python3";
@@ -125,30 +88,10 @@
               default_tools_approval_mode = "auto";
             };
 
-            mcp_servers.context7 = {
-              command = lib.getExe context7McpServer;
-              startup_timeout_sec = 20;
-              tool_timeout_sec = 60;
-              default_tools_approval_mode = "auto";
-            };
-
             mcp_servers.openaiDeveloperDocs = {
               url = "https://developers.openai.com/mcp";
               startup_timeout_sec = 20;
               tool_timeout_sec = 60;
-              default_tools_approval_mode = "auto";
-            };
-
-            mcp_servers.github = {
-              command = lib.getExe githubMcpServer;
-              args = [
-                "--read-only"
-                "--toolsets"
-                "repos,issues,pull_requests,users"
-                "stdio"
-              ];
-              startup_timeout_sec = 20;
-              tool_timeout_sec = 120;
               default_tools_approval_mode = "auto";
             };
 

@@ -1,0 +1,10 @@
+keys:
+  - &admin_funforgiven age14xx2n9unst4zc02lt26fxez8hg9ke44hrwefm3c9w79fap29mpuqu26eea
+  - &host_parmigiano age124tkmur0lvtqykjrv7um30s74rp9a5s8djytsd3kj5pet9v5hq3qzsm7r6
+
+creation_rules:
+  - path_regex: ^secrets/[^/]+\.(yaml|json|sops)$
+    key_groups:
+      - age:
+          - *admin_funforgiven
+          - *host_parmigiano

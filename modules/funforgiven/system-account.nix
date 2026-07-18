@@ -14,7 +14,6 @@ in
           description = user.name;
           home = user.homeDirectory;
           shell = pkgs.fish;
-          hashedPasswordFile = "/var/lib/nixos-secrets/${user.username}-password.hash";
           extraGroups = [
             "wheel"
             "networkmanager"
