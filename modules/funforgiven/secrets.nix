@@ -110,61 +110,72 @@ let
       };
     in
     {
-      home.file = {
-        ".ssh/allowed_signers".text = ''
-          ${config.programs.git.settings.user.email} ${githubPublicKey}
-          ${config.programs.git.settings.user.email} ${historicalSigningPublicKey}
-        '';
-        ".ssh/github_ed25519.pub".text = "${githubPublicKey}\n";
+      options.dendritic.gitAuthenticationPublicKey = lib.mkOption {
+        type = lib.types.singleLineStr;
+        readOnly = true;
+        internal = true;
+        description = "Evaluated public identity for Git authentication and signing evidence.";
       };
 
-      programs = {
-        codex.enableMcpIntegration = true;
+      config = {
+        dendritic.gitAuthenticationPublicKey = githubPublicKey;
 
-        git = {
-          signing = {
-            format = "ssh";
-            key = secretPaths.github-ssh-key;
-            signByDefault = true;
-          };
-          settings.gpg.ssh.allowedSignersFile = allowedSignersFile;
+        home.file = {
+          ".ssh/allowed_signers".text = ''
+            ${config.programs.git.settings.user.email} ${githubPublicKey}
+            ${config.programs.git.settings.user.email} ${historicalSigningPublicKey}
+          '';
+          ".ssh/github_ed25519.pub".text = "${githubPublicKey}\n";
         };
 
-        mcp = {
-          enable = true;
-          servers = {
-            context7 = {
-              command = lib.getExe context7McpLauncher;
-              startup_timeout_sec = 20;
-              tool_timeout_sec = 60;
-              default_tools_approval_mode = "auto";
+        programs = {
+          codex.enableMcpIntegration = true;
+
+          git = {
+            signing = {
+              format = "ssh";
+              key = secretPaths.github-ssh-key;
+              signByDefault = true;
             };
-            github = {
-              command = lib.getExe scopedGithubMcpLauncher;
-              args = [
-                "--toolsets"
-                "repos,issues,pull_requests,users"
-                "stdio"
-              ];
-              startup_timeout_sec = 20;
-              tool_timeout_sec = 120;
-              default_tools_approval_mode = "writes";
+            settings.gpg.ssh.allowedSignersFile = allowedSignersFile;
+          };
+
+          mcp = {
+            enable = true;
+            servers = {
+              context7 = {
+                command = lib.getExe context7McpLauncher;
+                startup_timeout_sec = 20;
+                tool_timeout_sec = 60;
+                default_tools_approval_mode = "auto";
+              };
+              github = {
+                command = lib.getExe scopedGithubMcpLauncher;
+                args = [
+                  "--toolsets"
+                  "repos,issues,pull_requests,users"
+                  "stdio"
+                ];
+                startup_timeout_sec = 20;
+                tool_timeout_sec = 120;
+                default_tools_approval_mode = "writes";
+              };
             };
           };
-        };
 
-        ssh = {
-          enable = true;
-          enableDefaultConfig = false;
-          settings = {
-            "github.com" = {
-              HostName = "github.com";
-              User = "git";
-              IdentityAgent = "none";
-              IdentitiesOnly = true;
-              IdentityFile = secretPaths.github-ssh-key;
+          ssh = {
+            enable = true;
+            enableDefaultConfig = false;
+            settings = {
+              "github.com" = {
+                HostName = "github.com";
+                User = "git";
+                IdentityAgent = "none";
+                IdentitiesOnly = true;
+                IdentityFile = secretPaths.github-ssh-key;
+              };
+              "*".IdentityAgent = "none";
             };
-            "*".IdentityAgent = "none";
           };
         };
       };
