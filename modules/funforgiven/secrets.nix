@@ -63,9 +63,13 @@ let
     };
 
   mkSecretConsumers =
-    secretPaths:
+    {
+      secretPaths,
+      sshConfigPath,
+    }:
     {
       config,
+      lib,
       pkgs,
       ...
     }:
@@ -121,6 +125,7 @@ let
         dendritic.gitAuthenticationPublicKey = githubPublicKey;
 
         home.file = {
+          ".ssh/config".source = lib.mkForce (config.lib.file.mkOutOfStoreSymlink sshConfigPath);
           ".ssh/allowed_signers".text = ''
             ${config.programs.git.settings.user.email} ${githubPublicKey}
             ${config.programs.git.settings.user.email} ${historicalSigningPublicKey}
@@ -196,6 +201,7 @@ in
       { config, lib, ... }:
       let
         deployedSecretPaths = lib.genAttrs consumerSecretNames (name: config.sops.secrets.${name}.path);
+        githubSshConfig = config.sops.templates."github-ssh-config";
         passwordHashSecret = config.sops.secrets.${passwordHashSecretName};
         secretPermissions = {
           owner = config.users.users.${user.username}.name;
@@ -223,6 +229,13 @@ in
             assertion = config.users.users.${user.username}.hashedPasswordFile == passwordHashSecret.path;
             message = "The immutable account must consume the sops-nix password-hash secret.";
           }
+          {
+            assertion =
+              githubSshConfig.owner == secretPermissions.owner
+              && githubSshConfig.group == secretPermissions.group
+              && githubSshConfig.mode == "0600";
+            message = "The OpenSSH client config must be rendered as a private user-owned file.";
+          }
         ];
 
         sops = {
@@ -237,10 +250,17 @@ in
               mode = "0400";
             };
           };
+          templates."github-ssh-config" = secretPermissions // {
+            content = config.home-manager.users.${user.username}.home.file.".ssh/config".text;
+            mode = "0600";
+          };
         };
 
         home-manager.users.${user.username}.imports = [
-          (mkSecretConsumers deployedSecretPaths)
+          (mkSecretConsumers {
+            secretPaths = deployedSecretPaths;
+            sshConfigPath = githubSshConfig.path;
+          })
         ];
 
         services.openssh.generateHostKeys = true;
@@ -256,15 +276,25 @@ in
       { config, lib, ... }:
       let
         deployedSecretPaths = lib.genAttrs consumerSecretNames (name: config.sops.secrets.${name}.path);
+        githubSshConfig = config.sops.templates."github-ssh-config";
       in
       {
-        imports = [ (mkSecretConsumers deployedSecretPaths) ];
+        imports = [
+          (mkSecretConsumers {
+            secretPaths = deployedSecretPaths;
+            sshConfigPath = githubSshConfig.path;
+          })
+        ];
 
         sops = {
           age.keyFile = "${config.xdg.configHome}/sops/age/keys.txt";
           defaultSopsFile = apiTokensFile;
           defaultSopsFormat = "yaml";
           secrets = mkConsumerSopsSecrets { mode = "0400"; };
+          templates."github-ssh-config" = {
+            content = config.home.file.".ssh/config".text;
+            mode = "0600";
+          };
         };
       }
     )
