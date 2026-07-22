@@ -263,6 +263,7 @@ in
           })
         ];
 
+        programs.ssh.systemd-ssh-proxy.enable = false;
         services.openssh.generateHostKeys = true;
         users.users.${user.username}.hashedPasswordFile =
           config.sops.secrets.${passwordHashSecretName}.path;
