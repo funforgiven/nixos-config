@@ -32,12 +32,16 @@ rg --quiet --fixed-strings 'return AudioModel.isSelectableOutput(output, outputI
 
 rg --quiet --fixed-strings 'process.command = root._launchCommand(entry);' "$app_service"
 rg --quiet --fixed-strings 'return LaunchCommand.app2unitService(' "$app_service"
-rg --quiet --fixed-strings 'function app2unitService(launcher, id)' \
+rg --quiet --fixed-strings 'function app2unitService(launcher, id, applicationStopTimeout)' \
   "$shell_config/services/LaunchCommand.js"
 rg --quiet --fixed-strings 'desktopEntryId(id)' "$shell_config/services/LaunchCommand.js"
 ! rg --quiet --fixed-strings '"--property=JobTimeoutSec=' "$shell_config/services"
 rg --quiet --fixed-strings 'desktop-entry launcher did not complete its start job within 7 seconds' "$app_service"
 rg --quiet --fixed-strings '"app-graphical.slice"' "$shell_config/services/LaunchCommand.js"
+rg --quiet --fixed-strings '"TimeoutStopSec=" + stopTimeout' "$shell_config/services/LaunchCommand.js"
+rg --quiet --fixed-strings '"KillMode=control-group"' "$shell_config/services/LaunchCommand.js"
+rg --quiet --fixed-strings '"KillSignal=SIGTERM"' "$shell_config/services/LaunchCommand.js"
+rg --quiet --fixed-strings '"SendSIGKILL=yes"' "$shell_config/services/LaunchCommand.js"
 ! rg --quiet --fixed-strings 'entry.execute()' "$app_service"
 ! rg --quiet --fixed-strings 'Quickshell.execDetached' "$app_service"
 rg --quiet --fixed-strings 'function launcherApplications(revision)' "$app_service"
@@ -63,12 +67,10 @@ rg --quiet --fixed-strings '_abortActionQueue("niri event state became stale: " 
 rg --quiet --fixed-strings 'if (!root.connected || root.stale)' "$niri_service"
 rg --quiet --fixed-strings 'if (!root._eventGenerationHealthy && root.connected && !root.stale)' "$niri_service"
 test "$(rg --count --fixed-strings 'root._eventReconnectAttempt = 0;' "$niri_service")" -eq 1
-rg --quiet --fixed-strings 'function quit(skipConfirmation)' \
+! rg --quiet --fixed-strings 'skip_confirmation' \
   "$shell_config/services/NiriProtocol.js" "$niri_service"
-rg --quiet --fixed-strings 'skip_confirmation: skipConfirmation' \
-  "$shell_config/services/NiriProtocol.js"
-rg --quiet --fixed-strings 'return root._enqueueAction("quit", NiriProtocol.quit(skipConfirmation));' \
-  "$niri_service"
+! rg --quiet --fixed-strings 'NiriProtocol.quit' \
+  "$shell_config/services/NiriProtocol.js" "$niri_service"
 rg --quiet --fixed-strings 'next._initialWorkspacesReceived' \
   "$shell_config/services/NiriState.js"
 rg --quiet --fixed-strings 'next._initialWindowsReceived' \
@@ -87,6 +89,11 @@ rg --quiet \
 rg --quiet \
   'readonly property string systemctl: "/nix/store/.+-systemd-[^"]+/bin/systemctl"' \
   "$shell_config/generated/ShellConfig.qml"
+rg --quiet --fixed-strings 'readonly property string applicationStopTimeout: "10s"' \
+  "$shell_config/generated/ShellConfig.qml"
+rg --quiet --fixed-strings \
+  'readonly property var sessionActionUnits: ({"logout":"funforgiven-session-logout.service","poweroff":"funforgiven-session-poweroff.service","reboot":"funforgiven-session-reboot.service"})' \
+  "$shell_config/generated/ShellConfig.qml"
 
 test -f "$session_actions"
 test -f "$session_command"
@@ -97,19 +104,19 @@ rg --quiet --fixed-strings 'readonly property bool busy: root.activeAction.lengt
 rg --quiet --fixed-strings 'readonly property int confirmationTimeoutMs: 5000' \
   "$session_actions"
 rg --quiet --fixed-strings 'if (root.armedAction !== action)' "$session_actions"
-rg --quiet --fixed-strings 'NiriService.quit(true)' "$session_actions"
-rg --quiet --fixed-strings 'SessionCommand.systemctl(Shell.ShellConfig.systemctl, action)' \
+rg --quiet --fixed-strings 'SessionCommand.sessionAction(' \
   "$session_actions"
-rg --quiet --fixed-strings 'action !== "reboot" && action !== "poweroff"' \
+rg --quiet --fixed-strings 'Shell.ShellConfig.sessionActionUnits' "$session_actions"
+rg --quiet --fixed-strings 'action !== "logout" && action !== "reboot" && action !== "poweroff"' \
   "$session_command"
 rg --quiet --fixed-strings 'if (!binary.startsWith("/"))' "$session_command"
-rg --quiet --fixed-strings 'return [binary, "--check-inhibitors=yes", action];' \
+rg --quiet --fixed-strings 'return [binary, "--user", "start", unit];' \
   "$session_command"
 rg --quiet --fixed-strings 'stderr: StdioCollector {' "$session_actions"
 rg --quiet --fixed-strings 'process.errorText || process.outputText' "$session_actions"
 rg --quiet --fixed-strings 'root.failedAction = action;' "$session_actions"
 rg --quiet --fixed-strings 'root.error = detail;' "$session_actions"
-! rg --quiet -- '(--force|--check-inhibitors=no|"-i"|"--user")' \
+! rg --quiet -- '(--force|--check-inhibitors|"-i"|NiriService\.quit|NiriProtocol\.quit)' \
   "$session_actions" "$session_command"
 
 mkdir -p \
@@ -124,7 +131,14 @@ app2unit_output="$(
     XDG_CURRENT_DESKTOP=niri \
     XDG_DATA_HOME="$TMPDIR/app2unit-data" \
     XDG_DATA_DIRS="$TMPDIR/app2unit-empty" \
-    app2unit --test -t service -s app-graphical.slice -- firefox.desktop
+    app2unit --test \
+      -t service \
+      -s app-graphical.slice \
+      -p TimeoutStopSec=10s \
+      -p KillMode=control-group \
+      -p KillSignal=SIGTERM \
+      -p SendSIGKILL=yes \
+      -- firefox.desktop
 )"
 rg --quiet --fixed-strings '>--property=Type=exec<' <<<"$app2unit_output"
 rg --quiet --fixed-strings '>--property=ExitType=cgroup<' <<<"$app2unit_output"
@@ -132,6 +146,10 @@ rg --quiet --fixed-strings '>--working-directory=/tmp<' <<<"$app2unit_output"
 rg --quiet --fixed-strings '>--property=After=graphical-session.target<' <<<"$app2unit_output"
 rg --quiet --fixed-strings '>--property=PartOf=graphical-session.target<' <<<"$app2unit_output"
 rg --quiet --fixed-strings '>--property=SourcePath=' <<<"$app2unit_output"
+rg --quiet --fixed-strings '>--property=TimeoutStopSec=10s<' <<<"$app2unit_output"
+rg --quiet --fixed-strings '>--property=KillMode=control-group<' <<<"$app2unit_output"
+rg --quiet --fixed-strings '>--property=KillSignal=SIGTERM<' <<<"$app2unit_output"
+rg --quiet --fixed-strings '>--property=SendSIGKILL=yes<' <<<"$app2unit_output"
 rg --quiet --fixed-strings '>--slice=app-graphical.slice<' <<<"$app2unit_output"
 rg --quiet --fixed-strings '>--unit=app-niri-firefox@' <<<"$app2unit_output"
 rg --quiet --fixed-strings ">$true_executable<" <<<"$app2unit_output"

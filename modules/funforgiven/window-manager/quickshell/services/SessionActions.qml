@@ -53,20 +53,10 @@ QtObject {
         root.actionSucceeded(action);
     }
 
-    function _startLogout() {
-        root.activeAction = "logout";
-        root.actionStarted("logout");
-        var accepted = NiriService.quit(true);
-        if (!accepted && root.activeAction === "logout") {
-            root._fail("logout", NiriService.actionError || "Niri did not accept the logout request");
-        }
-        return accepted;
-    }
-
-    function _startSystemAction(action) {
+    function _startSessionAction(action) {
         var command;
         try {
-            command = SessionCommand.systemctl(Shell.ShellConfig.systemctl, action);
+            command = SessionCommand.sessionAction(Shell.ShellConfig.systemctl, Shell.ShellConfig.sessionActionUnits, action);
         } catch (commandError) {
             root._fail(action, commandError);
             return false;
@@ -101,7 +91,7 @@ QtObject {
 
         root.cancelConfirmation();
         root._clearFailure();
-        return action === "logout" ? root._startLogout() : root._startSystemAction(action);
+        return root._startSessionAction(action);
     }
 
     function requestLogout() {
@@ -151,20 +141,6 @@ QtObject {
         interval: root.confirmationTimeoutMs
         repeat: false
         onTriggered: root.armedAction = ""
-    }
-
-    property Connections _niriActions: Connections {
-        target: NiriService
-
-        function onActionSucceeded(actionName) {
-            if (actionName === "quit" && root.activeAction === "logout")
-                root._succeed("logout");
-        }
-
-        function onActionFailed(actionName, message) {
-            if (actionName === "quit" && root.activeAction === "logout")
-                root._fail("logout", message);
-        }
     }
 
     property Component _processComponent: Component {

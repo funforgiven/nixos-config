@@ -5,7 +5,7 @@ function text(value) {
     return String(value).trim();
 }
 
-function systemctl(executable, action) {
+function sessionAction(executable, actionUnits, action) {
     var binary = text(executable);
     if (binary.length === 0) {
         throw new Error("systemctl executable is empty");
@@ -13,15 +13,25 @@ function systemctl(executable, action) {
     if (!binary.startsWith("/")) {
         throw new Error("systemctl executable must be absolute");
     }
-    if (action !== "reboot" && action !== "poweroff") {
+    if (action !== "logout" && action !== "reboot" && action !== "poweroff") {
         throw new Error("unsupported system action: " + text(action));
     }
 
-    return [binary, "--check-inhibitors=yes", action];
+    if (actionUnits === null || typeof actionUnits !== "object") {
+        throw new Error("session action unit map is missing");
+    }
+
+    var expectedUnit = "funforgiven-session-" + action + ".service";
+    var unit = text(actionUnits[action]);
+    if (unit !== expectedUnit) {
+        throw new Error("invalid session action unit for " + action);
+    }
+
+    return [binary, "--user", "start", unit];
 }
 
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
-        systemctl: systemctl
+        sessionAction: sessionAction
     };
 }

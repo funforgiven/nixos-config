@@ -22,6 +22,7 @@ let
     "udisks"
     "zed"
     "power"
+    "session-shutdown"
     "storage"
     "zram"
     "audio"

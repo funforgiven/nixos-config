@@ -5,13 +5,6 @@ const AppIdentity = require("../services/AppIdentity.js");
 const NiriProtocol = require("../services/NiriProtocol.js");
 
 test("niri action builders match the pinned externally tagged IPC schema", () => {
-    assert.deepEqual(NiriProtocol.quit(false), {
-        Action: {
-            Quit: {
-                skip_confirmation: false
-            }
-        }
-    });
     assert.deepEqual(NiriProtocol.focusWorkspace(42), {
         Action: {
             FocusWorkspace: {
@@ -32,7 +25,6 @@ test("niri action builders match the pinned externally tagged IPC schema", () =>
 });
 
 test("niri builders reject lossy IDs and invalid monitor names", () => {
-    assert.equal(NiriProtocol.quit("false"), null);
     assert.equal(NiriProtocol.focusWorkspace(-1), null);
     assert.equal(NiriProtocol.focusWindow(1.5), null);
     assert.equal(NiriProtocol.focusWindow(9007199254740992), null);

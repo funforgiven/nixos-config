@@ -1,6 +1,7 @@
 { config, ... }:
 let
   quickshellConfigName = config.dendritic.quickshell.configName;
+  logoutUnit = config.dendritic.sessionShutdown.actionUnits.logout;
 in
 {
   home.gui =
@@ -16,6 +17,7 @@ in
       niriActionWith = action: argument: { action.${action} = argument; };
       mapActions = lib.mapAttrs (_: niriAction);
       quickshell = lib.getExe' config.programs.quickshell.package "qs";
+      systemctl = lib.getExe' pkgs.systemd "systemctl";
       launcherCommand = [
         quickshell
         "-c"
@@ -24,6 +26,12 @@ in
         "call"
         "launcher"
         "toggle"
+      ];
+      logoutCommand = [
+        systemctl
+        "--user"
+        "start"
+        logoutUnit
       ];
 
       workspaceNumbers = lib.range 1 9;
@@ -58,7 +66,9 @@ in
 
         "Mod+T" = spawn (lib.getExe pkgs.foot);
         "Mod+Return" = spawn (lib.getExe pkgs.foot);
-        "Mod+Shift+E" = niriAction "quit";
+        "Mod+Shift+E" = (spawn logoutCommand) // {
+          repeat = false;
+        };
 
         "Mod+Q" = (niriAction "close-window") // {
           repeat = false;

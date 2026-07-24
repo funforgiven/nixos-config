@@ -232,10 +232,6 @@ QtObject {
         return root._enqueueAction("focus-monitor", NiriProtocol.focusMonitor(output));
     }
 
-    function quit(skipConfirmation) {
-        return root._enqueueAction("quit", NiriProtocol.quit(skipConfirmation));
-    }
-
     function _driveActionQueue() {
         if (root._actionQueue.length === 0 || root._actionInFlight) {
             return;

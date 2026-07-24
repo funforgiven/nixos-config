@@ -1,4 +1,8 @@
-_: {
+{ config, ... }:
+let
+  applicationStopTimeout = "${toString config.dendritic.sessionShutdown.applicationStopTimeoutSeconds}s";
+in
+{
   home.gui =
     { lib, pkgs, ... }:
     let
@@ -21,7 +25,7 @@ _: {
           Service = {
             ExecStart = command;
             Slice = "app.slice";
-            TimeoutStopSec = "20s";
+            TimeoutStopSec = applicationStopTimeout;
           };
           Install.WantedBy = [ "graphical-session.target" ];
         };

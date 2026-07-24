@@ -5,6 +5,8 @@
 }:
 let
   shellConfigName = config.dendritic.quickshell.configName;
+  sessionShutdown = config.dendritic.sessionShutdown;
+  applicationStopTimeout = "${toString sessionShutdown.applicationStopTimeoutSeconds}s";
   quickshellWithPatches =
     pkgs: patches:
     pkgs.quickshell.overrideAttrs (previous: {
@@ -269,6 +271,8 @@ in
             readonly property string audioController: ${qmlString (lib.getExe' audioControllerPackage "funforgiven-audioctl")}
             readonly property string appLauncher: ${qmlString (lib.getExe pkgs.app2unit)}
             readonly property string systemctl: ${qmlString (lib.getExe' pkgs.systemd "systemctl")}
+            readonly property string applicationStopTimeout: ${qmlString applicationStopTimeout}
+            readonly property var sessionActionUnits: (${builtins.toJSON sessionShutdown.actionUnits})
             readonly property bool nativePolkitEnabled: ${
               if polkitAgent == "quickshell" then "true" else "false"
             }
@@ -379,8 +383,8 @@ in
           ];
           Restart = "on-failure";
           RestartSec = 1;
-          Slice = "app-graphical.slice";
-          TimeoutStopSec = "10s";
+          Slice = "session.slice";
+          TimeoutStopSec = applicationStopTimeout;
         };
       };
     };

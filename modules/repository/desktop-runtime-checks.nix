@@ -13,6 +13,7 @@
       userName = config.users.${hostModel.user}.username;
       homeConfigurationName = "${userName}@${hostName}";
       shellConfigName = config.dendritic.quickshell.configName;
+      sessionShutdown = config.dendritic.sessionShutdown;
       host = config.flake.nixosConfigurations.${hostName}.config;
       home = config.flake.homeConfigurations.${homeConfigurationName}.config;
       outputRoles = hostModel.niri.outputs;
@@ -49,12 +50,28 @@
       niriFocusPatch = ../funforgiven/window-manager/niri/patches/niri-focus-window-no-pointer-warp.patch;
       niriConfig = home.programs.niri.finalConfig;
       lowerNiriConfig = lib.toLower niriConfig;
+      sessionActionServices = lib.mapAttrs (
+        _: unit: home.systemd.user.services.${lib.removeSuffix ".service" unit}
+      ) sessionShutdown.actionUnits;
+      expectedLogoutCommand = [
+        (lib.getExe' pkgs.systemd "systemctl")
+        "--user"
+        "start"
+        sessionShutdown.actionUnits.logout
+      ];
       niriHasLayoutSwitch = lib.any (
         bind:
         let
           action = bind.action or { };
         in
         builtins.isAttrs action && builtins.hasAttr "switch-layout" action
+      ) (builtins.attrValues home.programs.niri.settings.binds);
+      niriHasDirectQuit = lib.any (
+        bind:
+        let
+          action = bind.action or { };
+        in
+        builtins.isAttrs action && builtins.hasAttr "quit" action
       ) (builtins.attrValues home.programs.niri.settings.binds);
       onePasswordWindowRule = lib.findFirst (
         rule: lib.any (match: (match.app-id or null) == "(?i)^(1password|onepassword)$") rule.matches
@@ -76,6 +93,16 @@
           quickshellEnabled = home.programs.quickshell.enable;
           quickshellSystemdEnabled = home.programs.quickshell.systemd.enable;
           quickshellUnit = home.systemd.user.services.quickshell;
+          sessionShutdown = {
+            applicationStopTimeout = "${toString sessionShutdown.applicationStopTimeoutSeconds}s";
+            authorizationTimeout = "${toString sessionShutdown.authorizationTimeoutSeconds}s";
+            inhibitDelayMax = "${toString sessionShutdown.inhibitDelayMaxSeconds}s";
+            coordinatorTimeout = "${toString sessionShutdown.coordinatorTimeoutSeconds}s";
+            logindInhibitDelayMax = host.services.logind.settings.Login.InhibitDelayMaxSec;
+            userManagerDefaultStop = home.systemd.user.settings.Manager.DefaultTimeoutStopSec;
+            inherit (sessionShutdown) actionUnits;
+            services = sessionActionServices;
+          };
           inherit expectedNiriProbe;
           quickshellDataDirs = lib.filter (
             value: lib.hasPrefix "XDG_DATA_DIRS=" value
@@ -164,7 +191,10 @@
             "toggle"
           ];
           launcherBind = home.programs.niri.settings.binds."Mod+Space";
+          logoutBind = home.programs.niri.settings.binds."Mod+Shift+E";
+          inherit expectedLogoutCommand;
           inherit niriHasLayoutSwitch;
+          inherit niriHasDirectQuit;
           trayClientUnits = map (name: home.systemd.user.services.${name}) [
             "discord"
             "telegram"
@@ -276,6 +306,7 @@
               and (.quickshellUnit.Service.PassEnvironment | sort) == ["NIRI_SOCKET", "WAYLAND_DISPLAY"]
               and .quickshellUnit.Service.ExecCondition == [.expectedNiriProbe]
               and .quickshellUnit.Service.Restart == "on-failure"
+              and .quickshellUnit.Service.Slice == "session.slice"
               and (.quickshellUnit.Service.Environment | map(select(startswith("PATH="))) | length == 1)
               and (.quickshellUnit.Service.Environment | index("QT_QPA_PLATFORMTHEME=qt6ct") != null)
               and .quickshellDataDirs == [.expectedQuickshellDataDirs]
@@ -285,6 +316,35 @@
                 and (.Unit.Wants | index("quickshell.service") != null)
                 and (.Unit.PartOf | index("graphical-session.target") != null)
                 and (.Unit.Requisite | index("graphical-session.target") != null)
+                and .Service.TimeoutStopSec == $contract.sessionShutdown.applicationStopTimeout
+              )
+              and .sessionShutdown.applicationStopTimeout == "10s"
+              and .sessionShutdown.inhibitDelayMax == "15s"
+              and .sessionShutdown.authorizationTimeout == "60s"
+              and .sessionShutdown.coordinatorTimeout == "80s"
+              and .sessionShutdown.logindInhibitDelayMax == .sessionShutdown.inhibitDelayMax
+              and .sessionShutdown.userManagerDefaultStop == .sessionShutdown.applicationStopTimeout
+              and .sessionShutdown.actionUnits == {
+                logout: "funforgiven-session-logout.service",
+                poweroff: "funforgiven-session-poweroff.service",
+                reboot: "funforgiven-session-reboot.service"
+              }
+              and all(
+                .sessionShutdown.services | to_entries[];
+                . as $service
+                | .value.Service.Type == "oneshot"
+                and .value.Service.Slice == "session.slice"
+                and .value.Service.TimeoutStartSec == $contract.sessionShutdown.coordinatorTimeout
+                and .value.Service.Environment == [
+                  "APPLICATION_STOP_TIMEOUT_SECONDS=10",
+                  "AUTHORIZATION_TIMEOUT_SECONDS=60"
+                ]
+                and ((.value.Unit.PartOf // []) | length) == 0
+                and ((.value.Unit.Requisite // []) | length) == 0
+                and (.value.Service.ExecStart | length) == 1
+                and (.value.Service.ExecStart[0] | contains("flock --nonblock --conflict-exit-code 75"))
+                and (.value.Service.ExecStart[0] | contains("%t/funforgiven-session-shutdown.lock"))
+                and (.value.Service.ExecStart[0] | endswith(" " + $service.key))
               )
               and .idle.enable == true
               and .idlePackage == .expectedIdlePackage
@@ -300,7 +360,10 @@
               and (.idle.timeouts[0].resumeCommand | contains("-c " + $contract.quickshellConfigName + " ipc call amoled deactivate"))
               and .launcherBind.repeat == false
               and .launcherBind.action.spawn == .expectedLauncherCommand
+              and .logoutBind.repeat == false
+              and .logoutBind.action.spawn == .expectedLogoutCommand
               and .niriHasLayoutSwitch == false
+              and .niriHasDirectQuit == false
               and ([.idle.events[] | select(. != null)] | length == 0)
               and (([.idle.timeouts[].command, .idle.timeouts[].resumeCommand] | join(" ") | ascii_downcase)
                 | test("swaylock|gtklock|hyprlock|suspend|dpms|power-off-monitors|lock[[:space:]]") | not)
@@ -483,6 +546,39 @@
             grep -Fq 'WlrLayershell.layer: WlrLayer.Overlay' ${shellConfig}/idle/AmoledOverlay.qml
             grep -Fq 'WlrLayershell.keyboardFocus: WlrKeyboardFocus.None' ${shellConfig}/idle/AmoledOverlay.qml
             grep -Fq 'mask: Region {}' ${shellConfig}/idle/AmoledOverlay.qml
+
+            shellcheck --shell=bash ${../funforgiven/window-manager/session-shutdown.sh}
+            shellcheck ${../funforgiven/window-manager/tests/session-shutdown-contract.sh}
+            bash ${../funforgiven/window-manager/tests/session-shutdown-contract.sh} \
+              ${../funforgiven/window-manager/session-shutdown.sh}
+            grep -Fq 'systemctl --check-inhibitors=no "$action"' \
+              ${../funforgiven/window-manager/session-shutdown.sh}
+            test "$(grep -Fc 'systemctl --user --job-mode=replace-irreversibly stop app.slice' \
+              ${../funforgiven/window-manager/session-shutdown.sh})" -eq 2
+            grep -Fq 'systemctl --user kill --kill-whom=all --signal=SIGKILL app.slice' \
+              ${../funforgiven/window-manager/session-shutdown.sh}
+            grep -Fq -- '--foreground' \
+              ${../funforgiven/window-manager/session-shutdown.sh}
+            grep -Fq -- '--kill-after=1s' \
+              ${../funforgiven/window-manager/session-shutdown.sh}
+            grep -Fq 'PreparingForShutdown' \
+              ${../funforgiven/window-manager/session-shutdown.sh}
+            grep -Fq 'systemctl --user --no-block --job-mode=replace-irreversibly start niri-shutdown.target' \
+              ${../funforgiven/window-manager/session-shutdown.sh}
+            grep -Fq 'systemctl --user --job-mode=replace-irreversibly start niri-shutdown.target' \
+              ${../funforgiven/window-manager/session-shutdown.sh}
+            grep -Fq -- '--mode=delay' ${../funforgiven/window-manager/session-shutdown.sh}
+            ! grep -Eq -- '(^|[[:space:]])(pkill|killall|sh -c|--force|--check-inhibitors=yes)([[:space:]]|$)' \
+              ${../funforgiven/window-manager/session-shutdown.sh}
+
+            grep -Fq 'BindsTo=graphical-session.target' \
+              ${home.programs.niri.package}/share/systemd/user/niri.service
+            grep -Fq 'Before=graphical-session.target' \
+              ${home.programs.niri.package}/share/systemd/user/niri.service
+            grep -Fq 'Conflicts=graphical-session.target graphical-session-pre.target' \
+              ${home.programs.niri.package}/share/systemd/user/niri-shutdown.target
+            grep -Fq 'After=graphical-session.target graphical-session-pre.target' \
+              ${home.programs.niri.package}/share/systemd/user/niri-shutdown.target
             grep -Fq 'trayDelegate.trayItem.activate();' ${shellConfig}/bar/Tray.qml
             grep -Fq 'trayDelegate.showMenu();' ${shellConfig}/bar/Tray.qml
             grep -Fqx '0=Control+space' ${fcitxConfig}/config

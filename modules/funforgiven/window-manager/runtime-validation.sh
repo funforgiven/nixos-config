@@ -190,6 +190,32 @@ unit_property() {
     fi
 }
 
+manager_property() {
+    local property=$1
+    local destination="$tmpdir/manager-$property"
+
+    if capture_text "manager:$property" "$destination" \
+        systemctl --user show --property="$property" --value; then
+        cat "$destination"
+    fi
+}
+
+logind_inhibit_delay_max_usec="0"
+if capture_json \
+    "logind:InhibitDelayMaxUSec" \
+    "$tmpdir/logind-inhibit-delay.json" \
+    '{"type":"","data":0}' \
+    busctl --system --json=short get-property \
+    org.freedesktop.login1 \
+    /org/freedesktop/login1 \
+    org.freedesktop.login1.Manager \
+    InhibitDelayMaxUSec; then
+    logind_inhibit_delay_max_usec="$(
+        jq -r 'if .type == "t" then (.data | tostring) else "0" end' \
+            "$tmpdir/logind-inhibit-delay.json"
+    )"
+fi
+
 niri_models_match() {
     jq -e -n \
         --slurpfile workspaces "$tmpdir/workspaces.json" \
@@ -284,7 +310,9 @@ audio_models_match() {
 
 quickshell_state="$(unit_property quickshell.service ActiveState)"
 quickshell_pid="$(unit_property quickshell.service MainPID)"
+quickshell_slice="$(unit_property quickshell.service Slice)"
 graphical_session_state="$(unit_property graphical-session.target ActiveState)"
+user_manager_default_stop="$(manager_property DefaultTimeoutStopUSec)"
 swayidle_state="$(unit_property swayidle.service ActiveState)"
 swaybg_state="$(unit_property swaybg.service ActiveState)"
 document_portal_state="$(unit_property xdg-document-portal.service ActiveState)"
@@ -297,6 +325,33 @@ mako_state="$(unit_property mako.service ActiveState)"
 swaync_state="$(unit_property swaync.service ActiveState)"
 fcitx_state="$(unit_property fcitx5-daemon.service ActiveState)"
 fcitx_pid="$(unit_property fcitx5-daemon.service MainPID)"
+while IFS=$'\t' read -r action unit; do
+    jq -n \
+        --arg action "$action" \
+        --arg unit "$unit" \
+        --arg loadState "$(unit_property "$unit" LoadState)" \
+        --arg activeState "$(unit_property "$unit" ActiveState)" \
+        --arg slice "$(unit_property "$unit" Slice)" \
+        --arg partOf "$(unit_property "$unit" PartOf)" \
+        --arg requisite "$(unit_property "$unit" Requisite)" \
+        --arg environment "$(unit_property "$unit" Environment)" \
+        --arg timeoutStart "$(unit_property "$unit" TimeoutStartUSec)" \
+        '{
+          action: $action,
+          unit: $unit,
+          loadState: $loadState,
+          activeState: $activeState,
+          slice: $slice,
+          partOf: ($partOf | split(" ") | map(select(length > 0))),
+          requisite: ($requisite | split(" ") | map(select(length > 0))),
+          environment: ($environment | split(" ") | map(select(length > 0))),
+          timeoutStart: $timeoutStart
+        }' >>"$tmpdir/session-actions.jsonl"
+done < <(
+    jq -r '.sessionShutdown.actionUnits | to_entries[] | [.key, .value] | @tsv' \
+        "$RUNTIME_VALIDATION_EXPECTED"
+)
+jq -s 'sort_by(.action)' "$tmpdir/session-actions.jsonl" >"$tmpdir/session-actions.json"
 fcitx_runtime_state="0"
 fcitx_current_input_method=""
 if capture_text "fcitx-state" "$tmpdir/fcitx-state" fcitx5-remote --check; then
@@ -364,7 +419,10 @@ jq -n \
     --arg quickshell "$quickshell_state" \
     --arg quickshellPid "$quickshell_pid" \
     --arg quickshellExecutable "$quickshell_executable" \
+    --arg quickshellSlice "$quickshell_slice" \
     --arg graphicalSession "$graphical_session_state" \
+    --arg userManagerDefaultStop "$user_manager_default_stop" \
+    --arg logindInhibitDelayMaxUSec "$logind_inhibit_delay_max_usec" \
     --arg swayidle "$swayidle_state" \
     --arg swaybg "$swaybg_state" \
     --arg documentPortal "$document_portal_state" \
@@ -387,7 +445,10 @@ jq -n \
         quickshell: $quickshell,
         quickshellPid: ($quickshellPid | tonumber? // 0),
         quickshellExecutable: $quickshellExecutable,
+        quickshellSlice: $quickshellSlice,
         graphicalSession: $graphicalSession,
+        userManagerDefaultStop: $userManagerDefaultStop,
+        logindInhibitDelayMaxUSec: ($logindInhibitDelayMaxUSec | tonumber? // 0),
         swayidle: $swayidle,
         swaybg: $swaybg,
         documentPortal: $documentPortal,
@@ -465,6 +526,7 @@ jq -n \
     --slurpfile quickshellRuntimeErrors "$tmpdir/quickshell-runtime-errors.json" \
     --slurpfile audioGraphContract "$tmpdir/audio-graph-contract.json" \
     --slurpfile probes "$tmpdir/probes.json" \
+    --slurpfile sessionActions "$tmpdir/session-actions.json" \
     --argjson niriModelsSettled "$niri_models_settled" \
     --argjson audioModelsSettled "$audio_models_settled" '
     def property_is_true:
@@ -493,6 +555,7 @@ jq -n \
     | $quickshellRuntimeErrors[0] as $quickshellRuntimeErrors
     | $audioGraphContract[0] as $audioGraphContract
     | $probes[0] as $probes
+    | $sessionActions[0] as $sessionActions
     | ([
         $pipewire[]?
         | select(.info.props."funforgiven.audio.kind" == "sink")
@@ -573,6 +636,37 @@ jq -n \
         check("graphical session target";
           $services.graphicalSession == "active";
           $services.graphicalSession),
+        check("bounded user service stop budget";
+          $services.userManagerDefaultStop == $expected.sessionShutdown.applicationStopTimeout;
+          {
+            expected: $expected.sessionShutdown.applicationStopTimeout,
+            running: $services.userManagerDefaultStop
+          }),
+        check("bounded logind shutdown delay";
+          $services.logindInhibitDelayMaxUSec == $expected.sessionShutdown.inhibitDelayMaxUSec;
+          {
+            expected: $expected.sessionShutdown.inhibitDelayMaxUSec,
+            running: $services.logindInhibitDelayMaxUSec
+          }),
+        check("idle supervised session action coordinators";
+          ($sessionActions | length) == 3
+            and all($sessionActions[];
+              .loadState == "loaded"
+                and .activeState == "inactive"
+                and .slice == "session.slice"
+                and .partOf == []
+                and .requisite == []
+                and (.environment | sort) == ([
+                  $expected.sessionShutdown.applicationStopTimeoutEnvironment,
+                  $expected.sessionShutdown.authorizationTimeoutEnvironment
+                ] | sort)
+                and .timeoutStart == $expected.sessionShutdown.coordinatorTimeout
+                and (
+                  .action as $action
+                  | .unit == $expected.sessionShutdown.actionUnits[$action]
+                )
+            );
+          $sessionActions),
         check("runtime probes succeeded";
           ($probes | length) > 0 and all($probes[]; .ok == true);
           {
@@ -580,8 +674,14 @@ jq -n \
             failed: [ $probes[] | select(.ok != true) ]
           }),
         check("supervised shell service";
-          $services.quickshell == "active" and $services.quickshellPid > 0;
-          { state: $services.quickshell, pid: $services.quickshellPid }),
+          $services.quickshell == "active"
+            and $services.quickshellPid > 0
+            and $services.quickshellSlice == "session.slice";
+          {
+            state: $services.quickshell,
+            pid: $services.quickshellPid,
+            slice: $services.quickshellSlice
+          }),
         check("current session runs the evaluated Quickshell";
           $services.quickshellExecutable == $expected.quickshellExecutable;
           {
