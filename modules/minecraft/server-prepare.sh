@@ -100,10 +100,10 @@ set_fml_max_threads() {
 
 write_eula() {
   local target_directory="$1"
-  local eula_accepted="$2"
+  local accepted="$2"
   local temporary_file
 
-  [[ "$eula_accepted" == "true" ]] ||
+  [[ "$accepted" == "true" ]] ||
     die "refusing to start without explicit Minecraft EULA acceptance"
 
   temporary_file="$(mktemp "${target_directory}/.eula.txt.XXXXXX")"
