@@ -424,7 +424,14 @@
               and (.inputMethod.package | contains("fcitx5-with-addons"))
               and .inputMethod.addons == ["fcitx5-mozc"]
               and .inputMethod.waylandFrontend == true
-              and .inputMethod.globalOptions."Hotkey/TriggerKeys"."0" == "Control+space"
+              and .inputMethod.globalOptions."Hotkey/TriggerKeys" == {}
+              and .inputMethod.globalOptions."Hotkey/AltTriggerKeys" == {}
+              and .inputMethod.globalOptions."Hotkey/ActivateKeys" == {}
+              and .inputMethod.globalOptions."Hotkey/DeactivateKeys" == {}
+              and .inputMethod.globalOptions."Hotkey/EnumerateForwardKeys" == {}
+              and .inputMethod.globalOptions."Hotkey/EnumerateBackwardKeys" == {}
+              and .inputMethod.globalOptions."Hotkey/EnumerateGroupForwardKeys" == {}
+              and .inputMethod.globalOptions."Hotkey/EnumerateGroupBackwardKeys" == {}
               and .inputMethod.globalOptions.Hotkey.EnumerateWithTriggerKeys == false
               and .inputMethod.globalOptions.Hotkey.EnumerateSkipFirst == true
               and .inputMethod.globalOptions.Behavior.ActiveByDefault == false
@@ -581,7 +588,8 @@
               ${home.programs.niri.package}/share/systemd/user/niri-shutdown.target
             grep -Fq 'trayDelegate.trayItem.activate();' ${shellConfig}/bar/Tray.qml
             grep -Fq 'trayDelegate.showMenu();' ${shellConfig}/bar/Tray.qml
-            grep -Fqx '0=Control+space' ${fcitxConfig}/config
+            grep -Fqx '[Hotkey/TriggerKeys]' ${fcitxConfig}/config
+            ! grep -Fq 'Control+space' ${fcitxConfig}/config
             grep -Fqx 'EnumerateSkipFirst=True' ${fcitxConfig}/config
             grep -Fqx 'EnumerateWithTriggerKeys=False' ${fcitxConfig}/config
             grep -Fqx '0=Turkish or Japanese' ${fcitxConfig}/profile

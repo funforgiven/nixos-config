@@ -13,11 +13,18 @@ in
     let
       fcitxGroupName = "Turkish or Japanese";
       desiredFcitxGlobalOptions = {
-        "Hotkey/TriggerKeys"."0" = "Control+space";
         Hotkey = {
           EnumerateWithTriggerKeys = false;
           EnumerateSkipFirst = true;
         };
+        "Hotkey/TriggerKeys" = { };
+        "Hotkey/AltTriggerKeys" = { };
+        "Hotkey/ActivateKeys" = { };
+        "Hotkey/DeactivateKeys" = { };
+        "Hotkey/EnumerateForwardKeys" = { };
+        "Hotkey/EnumerateBackwardKeys" = { };
+        "Hotkey/EnumerateGroupForwardKeys" = { };
+        "Hotkey/EnumerateGroupBackwardKeys" = { };
         Behavior = {
           ActiveByDefault = false;
           ShareInputState = "All";
@@ -59,7 +66,7 @@ in
         }
         {
           assertion = fcitxSettings.globalOptions == desiredFcitxGlobalOptions;
-          message = "Fcitx must own one global binary Ctrl+Space Turkish/Mozc state.";
+          message = "Fcitx language switching must be tray-only, with no global state-changing hotkeys.";
         }
         {
           assertion = fcitxSettings.inputMethod == desiredFcitxProfile;

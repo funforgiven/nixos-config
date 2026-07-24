@@ -218,12 +218,14 @@ real pointer/launch/routing stress matrix remain required.
    the failed exec visibly on the originating dock item. Launch and focus apps
    on every output; the pointer must remain on the dock, the nine-dot control
    must not react, and successful app launches must not flash tile chrome.
-   In Firefox, a Qt text field, and the terminal, verify both `Ctrl+Space` and
-   left-clicking the Fcitx tray item alternate only between inactive
-   `keyboard-tr` Turkish input and active `mozc` Japanese input. Right-click the
-   tray item and select each language directly. Verify romanized Japanese input
-   produces Hiragana preedit, `F6` converts the current composition to
-   Hiragana, and `F7` converts it to full Katakana without changing language.
+   In Firefox, a Qt text field, and the terminal, verify left-clicking the Fcitx
+   tray item alternates only between inactive `keyboard-tr` Turkish input and
+   active `mozc` Japanese input. Right-click the tray item and select each
+   language directly. Verify there is no keyboard shortcut that changes this
+   state. Verify romanized Japanese input produces Hiragana preedit, `F6`
+   converts the current composition to Hiragana, and `F7` converts it to full
+   Katakana without changing language. In Minecraft, verify `Ctrl+Space`
+   reaches the game unchanged for sprint-jumping and does not toggle Fcitx.
 3. Stress mixer open/outside-dismiss/reopen, rapid stream churn, drag cancel,
    partial grouped moves, PipeWire/WirePlumber restart, visible stale-action
    errors, and both routing persistence paths.
