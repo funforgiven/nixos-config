@@ -36,6 +36,7 @@ let
     "onepassword"
     "syncthing"
     "gaming"
+    "minecraft"
     "niri"
     "niri-greeter"
     "polkit-agent"
